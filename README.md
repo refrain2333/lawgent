@@ -41,7 +41,7 @@ LawGent/
 ├─ frontend/                   # Vue 前端
 │  └─ src/
 ├─ research/                   # 数据流水线与模型微调示例
-│  ├─ cloud_training_suite/    # 训练套件（含评估报告与图表）
+│  ├─ cloud_training_suite/    # 数据流水线、模型微调与评估示例
 │  └─ lawgent-db/              # 本地 PostgreSQL 容器编排
 ├─ models/                     # 模型目录（权重需自行下载，见下）
 └─ README.md
@@ -93,8 +93,16 @@ npm run dev
 
 本仓库**不包含**体积较大的数据与模型权重，需要按下列方式自行准备。
 
-**1. 检索数据**：将预处理好的向量、语料与知识图谱放入 `data/`，目录需与 `backend/.env` 中的
+**1. 检索数据**：数据来自下面两个公开数据集，需自行获取后按流水线处理，再放入 `data/`：
+
+- **刑事案例：CAIL2018** —— [github.com/thunlp/CAIL](https://github.com/thunlp/CAIL)
+  大规模中文法律判决预测数据集，含案件事实、罪名标注与适用法条。用于构建案例检索库与知识图谱。
+- **刑法条文：LawRefBook/Laws** —— [github.com/LawRefBook/Laws](https://github.com/LawRefBook/Laws)
+  开源法律文本库，提供结构化的刑法条文。
+
+处理后可得到 `data/processed/` 下的向量、案例与知识图谱文件，目录需与 `backend/.env` 中的
 `DATA_VECTORS_PATH`、`DATA_CRIMINAL_PATH`、`DATA_KG_PATH` 对应。
+处理流程见 `research/cloud_training_suite/data_pipeline/`。使用时请遵守各数据集自身的许可与条款。
 数据可从公开裁判文书语料与法律法规文本构建，具体流程可参考 `research/cloud_training_suite/data_pipeline/`。
 
 **2. Lawformer 基础模型**：从 [thunlp/Lawformer](https://huggingface.co/thunlp/Lawformer) 下载，
@@ -126,8 +134,10 @@ npm run dev
 | POST | `/sessions/{thread_id}/message` | 发送消息（SSE） |
 | POST | `/sessions/{thread_id}/advance` | 阶段推进 |
 | POST | `/sessions/{thread_id}/confirm` | 确认卡点 |
+| GET | `/sessions/{thread_id}/report` | 获取 S4 风险评估报告 |
 | GET | `/conversations` | 会话列表 |
 | GET | `/conversations/{thread_id}/messages` | 历史消息 |
+| DELETE | `/conversations/{thread_id}` | 删除会话 |
 
 阶段取值：`s1_collecting`、`s1_confirming`、`s2_searching`、`s2_failed`、
 `s3_collecting`、`s3_confirming`、`s4_generating`、`s4_done`、`s4_failed`。
@@ -142,10 +152,13 @@ uv run pytest
 ## 许可证与第三方
 
 - 本项目代码以 [MIT License](./LICENSE) 开源。
-- 本项目引用的第三方模型与数据（如 Lawformer、公开裁判文书语料）版权归各自作者所有，
-  使用前请遵守其原始许可证。详见 [THIRD_PARTY.md](./THIRD_PARTY.md)。
+- 本项目引用的第三方数据与模型（CAIL2018 数据集、LawRefBook/Laws 法条、thunlp/Lawformer 模型）
+  版权归各自作者所有，使用前请遵守其原始许可证。仓库不分发这些数据与权重，获取方式见上。
+  详见 [THIRD_PARTY.md](./THIRD_PARTY.md)。
 
 ## 免责声明
 
 本项目输出内容仅供学习、研究与辅助参考，不构成正式法律意见。实际案件请咨询执业律师并结合完整证据材料判断。
+
+
 
