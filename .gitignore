@@ -37,7 +37,10 @@ Thumbs.db
 !*.env.example
 
 # ---------- 大文件：数据 ----------
-data/
+data/*
+!data/cases/
+data/cases/*
+!data/cases/crime.txt
 data/**/*.pkl
 research/lawgent-db/data/
 

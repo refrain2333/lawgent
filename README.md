@@ -91,7 +91,9 @@ npm run dev
 
 ## 数据与模型准备
 
-本仓库**不包含**体积较大的数据与模型权重，需要按下列方式自行准备。
+本仓库只包含代码，较大的数据与模型权重需自行准备。完整的依赖清单、来源与放置位置见
+[DEPENDENCIES.md](./DEPENDENCIES.md)。下面是要点。
+
 
 **1. 检索数据**：数据来自下面两个公开数据集，需自行获取后按流水线处理，再放入 `data/`：
 
@@ -103,7 +105,6 @@ npm run dev
 处理后可得到 `data/processed/` 下的向量、案例与知识图谱文件，目录需与 `backend/.env` 中的
 `DATA_VECTORS_PATH`、`DATA_CRIMINAL_PATH`、`DATA_KG_PATH` 对应。
 处理流程见 `research/cloud_training_suite/data_pipeline/`。使用时请遵守各数据集自身的许可与条款。
-数据可从公开裁判文书语料与法律法规文本构建，具体流程可参考 `research/cloud_training_suite/data_pipeline/`。
 
 **2. Lawformer 基础模型**：从 [thunlp/Lawformer](https://huggingface.co/thunlp/Lawformer) 下载，
 放入 `models/lawformer/`，并在 `.env` 中设置 `LOCAL_MODEL_PATH`。
