@@ -1,0 +1,1941 @@
+{
+  "metadata": {
+    "timestamp": "20251026_200153",
+    "total_queries": 13,
+    "device": "cpu",
+    "model_info": {
+      "base": "thunlp/Lawformer",
+      "finetuned": "thunlp/Lawformer (Fine-tuned)"
+    }
+  },
+  "overall_metrics": {
+    "base": {
+      "mrr": 0.5270146520146521,
+      "precision@1": 0.46153846153846156,
+      "precision@3": 0.4230769230769231,
+      "precision@5": 0.5,
+      "precision@10": 0.782051282051282,
+      "hit_rate": 0.8461538461538461,
+      "avg_encode_time": 0.6236471029428335,
+      "avg_search_time": 0.003585411952092097
+    },
+    "finetuned": {
+      "mrr": 0.9102564102564104,
+      "precision@1": 0.8461538461538461,
+      "precision@3": 0.8974358974358974,
+      "precision@5": 1.0,
+      "precision@10": 1.0,
+      "hit_rate": 1.0,
+      "avg_encode_time": 0.602258718930758,
+      "avg_search_time": 0.0031237052037165714
+    }
+  },
+  "by_difficulty": {
+    "简单查询": {
+      "base": {
+        "mrr": 0.4444444444444445,
+        "precision@1": 0.3333333333333333,
+        "precision@3": 0.3333333333333333,
+        "precision@5": 0.3333333333333333,
+        "precision@10": 1.0,
+        "hit_rate": 1.0,
+        "avg_encode_time": 0.7424499988555908,
+        "avg_search_time": 0.004837830861409505
+      },
+      "finetuned": {
+        "mrr": 1.0,
+        "precision@1": 1.0,
+        "precision@3": 1.0,
+        "precision@5": 1.0,
+        "precision@10": 1.0,
+        "hit_rate": 1.0,
+        "avg_encode_time": 0.6189870039621989,
+        "avg_search_time": 0.003336747487386068
+      },
+      "improvement": {
+        "mrr": 125.0,
+        "precision@1": 200.00000000000006,
+        "hit_rate": 0.0
+      }
+    },
+    "中等查询": {
+      "base": {
+        "mrr": 0.5625,
+        "precision@1": 0.5,
+        "precision@3": 0.5,
+        "precision@5": 0.75,
+        "precision@10": 0.75,
+        "hit_rate": 0.75,
+        "avg_encode_time": 0.6249714493751526,
+        "avg_search_time": 0.0031006336212158203
+      },
+      "finetuned": {
+        "mrr": 1.0,
+        "precision@1": 1.0,
+        "precision@3": 1.0,
+        "precision@5": 1.0,
+        "precision@10": 1.0,
+        "hit_rate": 1.0,
+        "avg_encode_time": 0.5948328971862793,
+        "avg_search_time": 0.0029904842376708984
+      },
+      "improvement": {
+        "mrr": 77.77777777777779,
+        "precision@1": 100.0,
+        "hit_rate": 33.33333333333333
+      }
+    },
+    "复杂查询": {
+      "base": {
+        "mrr": 0.4226190476190476,
+        "precision@1": 0.3333333333333333,
+        "precision@3": 0.3333333333333333,
+        "precision@5": 0.3333333333333333,
+        "precision@10": 0.8888888888888888,
+        "hit_rate": 1.0,
+        "avg_encode_time": 0.5938005447387695,
+        "avg_search_time": 0.0034348169962565103
+      },
+      "finetuned": {
+        "mrr": 0.7777777777777777,
+        "precision@1": 0.6666666666666666,
+        "precision@3": 0.7222222222222222,
+        "precision@5": 1.0,
+        "precision@10": 1.0,
+        "hit_rate": 1.0,
+        "avg_encode_time": 0.6679173310597738,
+        "avg_search_time": 0.003533045450846354
+      },
+      "improvement": {
+        "mrr": 84.03755868544599,
+        "precision@1": 100.0,
+        "hit_rate": 0.0
+      }
+    },
+    "语义查询": {
+      "base": {
+        "mrr": 0.6666666666666666,
+        "precision@1": 0.6666666666666666,
+        "precision@3": 0.5,
+        "precision@5": 0.5,
+        "precision@10": 0.5,
+        "hit_rate": 0.6666666666666666,
+        "avg_encode_time": 0.5329249699910482,
+        "avg_search_time": 0.0031299591064453125
+      },
+      "finetuned": {
+        "mrr": 0.8333333333333334,
+        "precision@1": 0.6666666666666666,
+        "precision@3": 0.8333333333333334,
+        "precision@5": 1.0,
+        "precision@10": 1.0,
+        "hit_rate": 1.0,
+        "avg_encode_time": 0.5297729174296061,
+        "avg_search_time": 0.002678950627644857
+      },
+      "improvement": {
+        "mrr": 25.00000000000001,
+        "precision@1": 0.0,
+        "hit_rate": 50.000000000000014
+      }
+    }
+  },
+  "detailed_results": {
+    "base": {
+      "简单查询": [
+        {
+          "query": "故意杀人罪",
+          "expected": [
+            232
+          ],
+          "results": [
+            {
+              "article_number": 232,
+              "similarity": 0.8204696178436279,
+              "title": "中华人民共和国刑法 第232条"
+            },
+            {
+              "article_number": 25,
+              "similarity": 0.8192750215530396,
+              "title": "中华人民共和国刑法 第25条"
+            },
+            {
+              "article_number": 233,
+              "similarity": 0.8025249242782593,
+              "title": "中华人民共和国刑法 第233条"
+            },
+            {
+              "article_number": 443,
+              "similarity": 0.8024216294288635,
+              "title": "中华人民共和国刑法 第443条"
+            },
+            {
+              "article_number": 27,
+              "similarity": 0.8011587262153625,
+              "title": "中华人民共和国刑法 第27条"
+            },
+            {
+              "article_number": 234,
+              "similarity": 0.800804078578949,
+              "title": "中华人民共和国刑法 第234条"
+            },
+            {
+              "article_number": 14,
+              "similarity": 0.7943316102027893,
+              "title": "中华人民共和国刑法 第14条"
+            },
+            {
+              "article_number": 67,
+              "similarity": 0.7914221286773682,
+              "title": "中华人民共和国刑法 第67条"
+            },
+            {
+              "article_number": 235,
+              "similarity": 0.7910608649253845,
+              "title": "中华人民共和国刑法 第235条"
+            },
+            {
+              "article_number": 247,
+              "similarity": 0.7870014905929565,
+              "title": "中华人民共和国刑法 第247条"
+            }
+          ],
+          "metrics": {
+            "mrr": 1.0,
+            "precision@1": 1,
+            "precision@3": 1.0,
+            "precision@5": 1.0,
+            "precision@10": 1.0,
+            "hit": true,
+            "encode_time": 0.8486835956573486,
+            "search_time": 0.008085966110229492
+          }
+        },
+        {
+          "query": "盗窃罪",
+          "expected": [
+            264
+          ],
+          "results": [
+            {
+              "article_number": 269,
+              "similarity": 0.8344986438751221,
+              "title": "中华人民共和国刑法 第269条"
+            },
+            {
+              "article_number": 25,
+              "similarity": 0.8320882320404053,
+              "title": "中华人民共和国刑法 第25条"
+            },
+            {
+              "article_number": 287,
+              "similarity": 0.8244916796684265,
+              "title": "中华人民共和国刑法 第287条"
+            },
+            {
+              "article_number": 329,
+              "similarity": 0.8211736083030701,
+              "title": "中华人民共和国刑法 第329条"
+            },
+            {
+              "article_number": 27,
+              "similarity": 0.8171105980873108,
+              "title": "中华人民共和国刑法 第27条"
+            },
+            {
+              "article_number": 264,
+              "similarity": 0.8149300813674927,
+              "title": "中华人民共和国刑法 第264条"
+            },
+            {
+              "article_number": 26,
+              "similarity": 0.8117437362670898,
+              "title": "中华人民共和国刑法 第26条"
+            },
+            {
+              "article_number": 36,
+              "similarity": 0.8082833290100098,
+              "title": "中华人民共和国刑法 第36条"
+            },
+            {
+              "article_number": 74,
+              "similarity": 0.8028379082679749,
+              "title": "中华人民共和国刑法 第74条"
+            },
+            {
+              "article_number": 64,
+              "similarity": 0.8026221990585327,
+              "title": "中华人民共和国刑法 第64条"
+            }
+          ],
+          "metrics": {
+            "mrr": 0.16666666666666666,
+            "precision@1": 0,
+            "precision@3": 0.0,
+            "precision@5": 0.0,
+            "precision@10": 1.0,
+            "hit": true,
+            "encode_time": 0.8082528114318848,
+            "search_time": 0.004080295562744141
+          }
+        },
+        {
+          "query": "抢劫罪",
+          "expected": [
+            263
+          ],
+          "results": [
+            {
+              "article_number": 269,
+              "similarity": 0.8268977403640747,
+              "title": "中华人民共和国刑法 第269条"
+            },
+            {
+              "article_number": 25,
+              "similarity": 0.8038694858551025,
+              "title": "中华人民共和国刑法 第25条"
+            },
+            {
+              "article_number": 289,
+              "similarity": 0.798072338104248,
+              "title": "中华人民共和国刑法 第289条"
+            },
+            {
+              "article_number": 329,
+              "similarity": 0.7979591488838196,
+              "title": "中华人民共和国刑法 第329条"
+            },
+            {
+              "article_number": 36,
+              "similarity": 0.7950435876846313,
+              "title": "中华人民共和国刑法 第36条"
+            },
+            {
+              "article_number": 263,
+              "similarity": 0.7949482202529907,
+              "title": "中华人民共和国刑法 第263条"
+            },
+            {
+              "article_number": 66,
+              "similarity": 0.7936220169067383,
+              "title": "中华人民共和国刑法 第66条"
+            },
+            {
+              "article_number": 74,
+              "similarity": 0.7930459380149841,
+              "title": "中华人民共和国刑法 第74条"
+            },
+            {
+              "article_number": 27,
+              "similarity": 0.7921725511550903,
+              "title": "中华人民共和国刑法 第27条"
+            },
+            {
+              "article_number": 56,
+              "similarity": 0.7917814254760742,
+              "title": "中华人民共和国刑法 第56条"
+            }
+          ],
+          "metrics": {
+            "mrr": 0.16666666666666666,
+            "precision@1": 0,
+            "precision@3": 0.0,
+            "precision@5": 0.0,
+            "precision@10": 1.0,
+            "hit": true,
+            "encode_time": 0.5704135894775391,
+            "search_time": 0.002347230911254883
+          }
+        }
+      ],
+      "中等查询": [
+        {
+          "query": "故意杀人罪的量刑标准",
+          "expected": [
+            232
+          ],
+          "results": [
+            {
+              "article_number": 232,
+              "similarity": 0.8522713780403137,
+              "title": "中华人民共和国刑法 第232条"
+            },
+            {
+              "article_number": 233,
+              "similarity": 0.8278855681419373,
+              "title": "中华人民共和国刑法 第233条"
+            },
+            {
+              "article_number": 234,
+              "similarity": 0.8253354430198669,
+              "title": "中华人民共和国刑法 第234条"
+            },
+            {
+              "article_number": 247,
+              "similarity": 0.825304388999939,
+              "title": "中华人民共和国刑法 第247条"
+            },
+            {
+              "article_number": 235,
+              "similarity": 0.8245797157287598,
+              "title": "中华人民共和国刑法 第235条"
+            },
+            {
+              "article_number": 243,
+              "similarity": 0.8239624500274658,
+              "title": "中华人民共和国刑法 第243条"
+            },
+            {
+              "article_number": 61,
+              "similarity": 0.8213325142860413,
+              "title": "中华人民共和国刑法 第61条"
+            },
+            {
+              "article_number": 443,
+              "similarity": 0.8213192224502563,
+              "title": "中华人民共和国刑法 第443条"
+            },
+            {
+              "article_number": 48,
+              "similarity": 0.8187069296836853,
+              "title": "中华人民共和国刑法 第48条"
+            },
+            {
+              "article_number": 36,
+              "similarity": 0.8156650066375732,
+              "title": "中华人民共和国刑法 第36条"
+            }
+          ],
+          "metrics": {
+            "mrr": 1.0,
+            "precision@1": 1,
+            "precision@3": 1.0,
+            "precision@5": 1.0,
+            "precision@10": 1.0,
+            "hit": true,
+            "encode_time": 0.6161789894104004,
+            "search_time": 0.004496097564697266
+          }
+        },
+        {
+          "query": "盗窃罪的立案标准是什么",
+          "expected": [
+            264
+          ],
+          "results": [
+            {
+              "article_number": 16,
+              "similarity": 0.8134763836860657,
+              "title": "中华人民共和国刑法 第16条"
+            },
+            {
+              "article_number": 23,
+              "similarity": 0.8069025874137878,
+              "title": "中华人民共和国刑法 第23条"
+            },
+            {
+              "article_number": 269,
+              "similarity": 0.8006153106689453,
+              "title": "中华人民共和国刑法 第269条"
+            },
+            {
+              "article_number": 12,
+              "similarity": 0.7993523478507996,
+              "title": "中华人民共和国刑法 第12条"
+            },
+            {
+              "article_number": 329,
+              "similarity": 0.7976646423339844,
+              "title": "中华人民共和国刑法 第329条"
+            },
+            {
+              "article_number": 27,
+              "similarity": 0.7958906888961792,
+              "title": "中华人民共和国刑法 第27条"
+            },
+            {
+              "article_number": 287,
+              "similarity": 0.7928255796432495,
+              "title": "中华人民共和国刑法 第287条"
+            },
+            {
+              "article_number": 14,
+              "similarity": 0.7914546728134155,
+              "title": "中华人民共和国刑法 第14条"
+            },
+            {
+              "article_number": 22,
+              "similarity": 0.79025799036026,
+              "title": "中华人民共和国刑法 第22条"
+            },
+            {
+              "article_number": 61,
+              "similarity": 0.7883366942405701,
+              "title": "中华人民共和国刑法 第61条"
+            }
+          ],
+          "metrics": {
+            "mrr": 0,
+            "precision@1": 0,
+            "precision@3": 0.0,
+            "precision@5": 0.0,
+            "precision@10": 0.0,
+            "hit": false,
+            "encode_time": 0.6137471199035645,
+            "search_time": 0.0024423599243164062
+          }
+        },
+        {
+          "query": "交通肇事后逃逸如何处罚",
+          "expected": [
+            133
+          ],
+          "results": [
+            {
+              "article_number": 133,
+              "similarity": 0.7706456184387207,
+              "title": "中华人民共和国刑法 第133条"
+            },
+            {
+              "article_number": 183,
+              "similarity": 0.7312071323394775,
+              "title": "中华人民共和国刑法 第183条"
+            },
+            {
+              "article_number": 392,
+              "similarity": 0.7305512428283691,
+              "title": "中华人民共和国刑法 第392条"
+            },
+            {
+              "article_number": 11,
+              "similarity": 0.7277705669403076,
+              "title": "中华人民共和国刑法 第11条"
+            },
+            {
+              "article_number": 53,
+              "similarity": 0.7261289358139038,
+              "title": "中华人民共和国刑法 第53条"
+            },
+            {
+              "article_number": 36,
+              "similarity": 0.7235126495361328,
+              "title": "中华人民共和国刑法 第36条"
+            },
+            {
+              "article_number": 157,
+              "similarity": 0.7233896255493164,
+              "title": "中华人民共和国刑法 第157条"
+            },
+            {
+              "article_number": 235,
+              "similarity": 0.7226301431655884,
+              "title": "中华人民共和国刑法 第235条"
+            },
+            {
+              "article_number": 52,
+              "similarity": 0.7215094566345215,
+              "title": "中华人民共和国刑法 第52条"
+            },
+            {
+              "article_number": 247,
+              "similarity": 0.7207318544387817,
+              "title": "中华人民共和国刑法 第247条"
+            }
+          ],
+          "metrics": {
+            "mrr": 1.0,
+            "precision@1": 1,
+            "precision@3": 1.0,
+            "precision@5": 1.0,
+            "precision@10": 1.0,
+            "hit": true,
+            "encode_time": 0.7122910022735596,
+            "search_time": 0.0034580230712890625
+          }
+        },
+        {
+          "query": "诈骗罪数额特别巨大的量刑",
+          "expected": [
+            266
+          ],
+          "results": [
+            {
+              "article_number": 192,
+              "similarity": 0.8273674845695496,
+              "title": "中华人民共和国刑法 第192条"
+            },
+            {
+              "article_number": 74,
+              "similarity": 0.8257795572280884,
+              "title": "中华人民共和国刑法 第74条"
+            },
+            {
+              "article_number": 269,
+              "similarity": 0.8175173401832581,
+              "title": "中华人民共和国刑法 第269条"
+            },
+            {
+              "article_number": 266,
+              "similarity": 0.8117156028747559,
+              "title": "中华人民共和国刑法 第266条"
+            },
+            {
+              "article_number": 274,
+              "similarity": 0.8094286918640137,
+              "title": "中华人民共和国刑法 第274条"
+            },
+            {
+              "article_number": 268,
+              "similarity": 0.8026170134544373,
+              "title": "中华人民共和国刑法 第268条"
+            },
+            {
+              "article_number": 66,
+              "similarity": 0.8019113540649414,
+              "title": "中华人民共和国刑法 第66条"
+            },
+            {
+              "article_number": 198,
+              "similarity": 0.7978355288505554,
+              "title": "中华人民共和国刑法 第198条"
+            },
+            {
+              "article_number": 194,
+              "similarity": 0.7971175909042358,
+              "title": "中华人民共和国刑法 第194条"
+            },
+            {
+              "article_number": 195,
+              "similarity": 0.7966886162757874,
+              "title": "中华人民共和国刑法 第195条"
+            }
+          ],
+          "metrics": {
+            "mrr": 0.25,
+            "precision@1": 0,
+            "precision@3": 0.0,
+            "precision@5": 1.0,
+            "precision@10": 1.0,
+            "hit": true,
+            "encode_time": 0.5576686859130859,
+            "search_time": 0.002006053924560547
+          }
+        }
+      ],
+      "复杂查询": [
+        {
+          "query": "未成年人故意伤害他人致人重伤的刑事责任",
+          "expected": [
+            234,
+            17
+          ],
+          "results": [
+            {
+              "article_number": 17,
+              "similarity": 0.8307763934135437,
+              "title": "中华人民共和国刑法 第17条"
+            },
+            {
+              "article_number": 235,
+              "similarity": 0.816970705986023,
+              "title": "中华人民共和国刑法 第235条"
+            },
+            {
+              "article_number": 234,
+              "similarity": 0.8125773668289185,
+              "title": "中华人民共和国刑法 第234条"
+            },
+            {
+              "article_number": 262,
+              "similarity": 0.8063653111457825,
+              "title": "中华人民共和国刑法 第262条"
+            },
+            {
+              "article_number": 29,
+              "similarity": 0.7998943328857422,
+              "title": "中华人民共和国刑法 第29条"
+            },
+            {
+              "article_number": 36,
+              "similarity": 0.7954719662666321,
+              "title": "中华人民共和国刑法 第36条"
+            },
+            {
+              "article_number": 243,
+              "similarity": 0.7946323156356812,
+              "title": "中华人民共和国刑法 第243条"
+            },
+            {
+              "article_number": 233,
+              "similarity": 0.7888141870498657,
+              "title": "中华人民共和国刑法 第233条"
+            },
+            {
+              "article_number": 436,
+              "similarity": 0.7884806394577026,
+              "title": "中华人民共和国刑法 第436条"
+            },
+            {
+              "article_number": 443,
+              "similarity": 0.7847710251808167,
+              "title": "中华人民共和国刑法 第443条"
+            }
+          ],
+          "metrics": {
+            "mrr": 1.0,
+            "precision@1": 1,
+            "precision@3": 1.0,
+            "precision@5": 1.0,
+            "precision@10": 1.0,
+            "hit": true,
+            "encode_time": 0.6102497577667236,
+            "search_time": 0.0035359859466552734
+          }
+        },
+        {
+          "query": "入户盗窃携带凶器的法律后果",
+          "expected": [
+            264
+          ],
+          "results": [
+            {
+              "article_number": 269,
+              "similarity": 0.8118000030517578,
+              "title": "中华人民共和国刑法 第269条"
+            },
+            {
+              "article_number": 127,
+              "similarity": 0.8090091347694397,
+              "title": "中华人民共和国刑法 第127条"
+            },
+            {
+              "article_number": 129,
+              "similarity": 0.8043104410171509,
+              "title": "中华人民共和国刑法 第129条"
+            },
+            {
+              "article_number": 329,
+              "similarity": 0.8007754683494568,
+              "title": "中华人民共和国刑法 第329条"
+            },
+            {
+              "article_number": 284,
+              "similarity": 0.7960423231124878,
+              "title": "中华人民共和国刑法 第284条"
+            },
+            {
+              "article_number": 64,
+              "similarity": 0.7946102619171143,
+              "title": "中华人民共和国刑法 第64条"
+            },
+            {
+              "article_number": 56,
+              "similarity": 0.7900645732879639,
+              "title": "中华人民共和国刑法 第56条"
+            },
+            {
+              "article_number": 264,
+              "similarity": 0.7847633957862854,
+              "title": "中华人民共和国刑法 第264条"
+            },
+            {
+              "article_number": 14,
+              "similarity": 0.781937301158905,
+              "title": "中华人民共和国刑法 第14条"
+            },
+            {
+              "article_number": 438,
+              "similarity": 0.7815102338790894,
+              "title": "中华人民共和国刑法 第438条"
+            }
+          ],
+          "metrics": {
+            "mrr": 0.125,
+            "precision@1": 0,
+            "precision@3": 0.0,
+            "precision@5": 0.0,
+            "precision@10": 1.0,
+            "hit": true,
+            "encode_time": 0.5420048236846924,
+            "search_time": 0.003018617630004883
+          }
+        },
+        {
+          "query": "聚众斗殴致人重伤死亡的定罪量刑",
+          "expected": [
+            292,
+            234,
+            232
+          ],
+          "results": [
+            {
+              "article_number": 289,
+              "similarity": 0.844067394733429,
+              "title": "中华人民共和国刑法 第289条"
+            },
+            {
+              "article_number": 247,
+              "similarity": 0.8270273208618164,
+              "title": "中华人民共和国刑法 第247条"
+            },
+            {
+              "article_number": 235,
+              "similarity": 0.8166751861572266,
+              "title": "中华人民共和国刑法 第235条"
+            },
+            {
+              "article_number": 233,
+              "similarity": 0.81508868932724,
+              "title": "中华人民共和国刑法 第233条"
+            },
+            {
+              "article_number": 443,
+              "similarity": 0.8149404525756836,
+              "title": "中华人民共和国刑法 第443条"
+            },
+            {
+              "article_number": 48,
+              "similarity": 0.8133094906806946,
+              "title": "中华人民共和国刑法 第48条"
+            },
+            {
+              "article_number": 292,
+              "similarity": 0.8088316917419434,
+              "title": "中华人民共和国刑法 第292条"
+            },
+            {
+              "article_number": 290,
+              "similarity": 0.8072004318237305,
+              "title": "中华人民共和国刑法 第290条"
+            },
+            {
+              "article_number": 399,
+              "similarity": 0.8042962551116943,
+              "title": "中华人民共和国刑法 第399条"
+            },
+            {
+              "article_number": 234,
+              "similarity": 0.8042832612991333,
+              "title": "中华人民共和国刑法 第234条"
+            }
+          ],
+          "metrics": {
+            "mrr": 0.14285714285714285,
+            "precision@1": 0,
+            "precision@3": 0.0,
+            "precision@5": 0.0,
+            "precision@10": 0.6666666666666666,
+            "hit": true,
+            "encode_time": 0.6291470527648926,
+            "search_time": 0.003749847412109375
+          }
+        }
+      ],
+      "语义查询": [
+        {
+          "query": "杀人后自首会减轻处罚吗",
+          "expected": [
+            232,
+            67
+          ],
+          "results": [
+            {
+              "article_number": 67,
+              "similarity": 0.8510740995407104,
+              "title": "中华人民共和国刑法 第67条"
+            },
+            {
+              "article_number": 28,
+              "similarity": 0.8231371641159058,
+              "title": "中华人民共和国刑法 第28条"
+            },
+            {
+              "article_number": 74,
+              "similarity": 0.8107149004936218,
+              "title": "中华人民共和国刑法 第74条"
+            },
+            {
+              "article_number": 27,
+              "similarity": 0.8070031404495239,
+              "title": "中华人民共和国刑法 第27条"
+            },
+            {
+              "article_number": 392,
+              "similarity": 0.7995622158050537,
+              "title": "中华人民共和国刑法 第392条"
+            },
+            {
+              "article_number": 310,
+              "similarity": 0.7990565896034241,
+              "title": "中华人民共和国刑法 第310条"
+            },
+            {
+              "article_number": 52,
+              "similarity": 0.7976462244987488,
+              "title": "中华人民共和国刑法 第52条"
+            },
+            {
+              "article_number": 14,
+              "similarity": 0.7949106097221375,
+              "title": "中华人民共和国刑法 第14条"
+            },
+            {
+              "article_number": 62,
+              "similarity": 0.7930712699890137,
+              "title": "中华人民共和国刑法 第62条"
+            },
+            {
+              "article_number": 61,
+              "similarity": 0.7924294471740723,
+              "title": "中华人民共和国刑法 第61条"
+            }
+          ],
+          "metrics": {
+            "mrr": 1.0,
+            "precision@1": 1,
+            "precision@3": 0.5,
+            "precision@5": 0.5,
+            "precision@10": 0.5,
+            "hit": true,
+            "encode_time": 0.5624639987945557,
+            "search_time": 0.004066944122314453
+          }
+        },
+        {
+          "query": "偷东西被抓现行怎么判",
+          "expected": [
+            264
+          ],
+          "results": [
+            {
+              "article_number": 64,
+              "similarity": 0.7525280714035034,
+              "title": "中华人民共和国刑法 第64条"
+            },
+            {
+              "article_number": 53,
+              "similarity": 0.7456442713737488,
+              "title": "中华人民共和国刑法 第53条"
+            },
+            {
+              "article_number": 4,
+              "similarity": 0.7448893785476685,
+              "title": "中华人民共和国刑法 第4条"
+            },
+            {
+              "article_number": 59,
+              "similarity": 0.7317047119140625,
+              "title": "中华人民共和国刑法 第59条"
+            },
+            {
+              "article_number": 329,
+              "similarity": 0.7316492795944214,
+              "title": "中华人民共和国刑法 第329条"
+            },
+            {
+              "article_number": 49,
+              "similarity": 0.7274889349937439,
+              "title": "中华人民共和国刑法 第49条"
+            },
+            {
+              "article_number": 12,
+              "similarity": 0.7265410423278809,
+              "title": "中华人民共和国刑法 第12条"
+            },
+            {
+              "article_number": 316,
+              "similarity": 0.7261151671409607,
+              "title": "中华人民共和国刑法 第316条"
+            },
+            {
+              "article_number": 18,
+              "similarity": 0.7258780598640442,
+              "title": "中华人民共和国刑法 第18条"
+            },
+            {
+              "article_number": 27,
+              "similarity": 0.7246094942092896,
+              "title": "中华人民共和国刑法 第27条"
+            }
+          ],
+          "metrics": {
+            "mrr": 0,
+            "precision@1": 0,
+            "precision@3": 0.0,
+            "precision@5": 0.0,
+            "precision@10": 0.0,
+            "hit": false,
+            "encode_time": 0.5210056304931641,
+            "search_time": 0.002013683319091797
+          }
+        },
+        {
+          "query": "酒后开车撞死人要坐牢多久",
+          "expected": [
+            133
+          ],
+          "results": [
+            {
+              "article_number": 133,
+              "similarity": 0.7434868216514587,
+              "title": "中华人民共和国刑法 第133条"
+            },
+            {
+              "article_number": 122,
+              "similarity": 0.7387962341308594,
+              "title": "中华人民共和国刑法 第122条"
+            },
+            {
+              "article_number": 48,
+              "similarity": 0.7386896014213562,
+              "title": "中华人民共和国刑法 第48条"
+            },
+            {
+              "article_number": 18,
+              "similarity": 0.736214280128479,
+              "title": "中华人民共和国刑法 第18条"
+            },
+            {
+              "article_number": 116,
+              "similarity": 0.7352283000946045,
+              "title": "中华人民共和国刑法 第116条"
+            },
+            {
+              "article_number": 73,
+              "similarity": 0.7303825616836548,
+              "title": "中华人民共和国刑法 第73条"
+            },
+            {
+              "article_number": 121,
+              "similarity": 0.7297159433364868,
+              "title": "中华人民共和国刑法 第121条"
+            },
+            {
+              "article_number": 57,
+              "similarity": 0.7266379594802856,
+              "title": "中华人民共和国刑法 第57条"
+            },
+            {
+              "article_number": 14,
+              "similarity": 0.7266222238540649,
+              "title": "中华人民共和国刑法 第14条"
+            },
+            {
+              "article_number": 413,
+              "similarity": 0.7263467907905579,
+              "title": "中华人民共和国刑法 第413条"
+            }
+          ],
+          "metrics": {
+            "mrr": 1.0,
+            "precision@1": 1,
+            "precision@3": 1.0,
+            "precision@5": 1.0,
+            "precision@10": 1.0,
+            "hit": true,
+            "encode_time": 0.5153052806854248,
+            "search_time": 0.0033092498779296875
+          }
+        }
+      ]
+    },
+    "finetuned": {
+      "简单查询": [
+        {
+          "query": "故意杀人罪",
+          "expected": [
+            232
+          ],
+          "results": [
+            {
+              "article_number": 232,
+              "similarity": 0.8955519795417786,
+              "title": "中华人民共和国刑法 第232条"
+            },
+            {
+              "article_number": 25,
+              "similarity": 0.6514383554458618,
+              "title": "中华人民共和国刑法 第25条"
+            },
+            {
+              "article_number": 234,
+              "similarity": 0.6172901391983032,
+              "title": "中华人民共和国刑法 第234条"
+            },
+            {
+              "article_number": 260,
+              "similarity": 0.6167049407958984,
+              "title": "中华人民共和国刑法 第260条"
+            },
+            {
+              "article_number": 236,
+              "similarity": 0.5741966962814331,
+              "title": "中华人民共和国刑法 第236条"
+            },
+            {
+              "article_number": 233,
+              "similarity": 0.5689671039581299,
+              "title": "中华人民共和国刑法 第233条"
+            },
+            {
+              "article_number": 257,
+              "similarity": 0.5524023771286011,
+              "title": "中华人民共和国刑法 第257条"
+            },
+            {
+              "article_number": 49,
+              "similarity": 0.5516080856323242,
+              "title": "中华人民共和国刑法 第49条"
+            },
+            {
+              "article_number": 239,
+              "similarity": 0.5488086938858032,
+              "title": "中华人民共和国刑法 第239条"
+            },
+            {
+              "article_number": 235,
+              "similarity": 0.5419455766677856,
+              "title": "中华人民共和国刑法 第235条"
+            }
+          ],
+          "metrics": {
+            "mrr": 1.0,
+            "precision@1": 1,
+            "precision@3": 1.0,
+            "precision@5": 1.0,
+            "precision@10": 1.0,
+            "hit": true,
+            "encode_time": 0.6742837429046631,
+            "search_time": 0.0038042068481445312
+          }
+        },
+        {
+          "query": "盗窃罪",
+          "expected": [
+            264
+          ],
+          "results": [
+            {
+              "article_number": 264,
+              "similarity": 0.8347354531288147,
+              "title": "中华人民共和国刑法 第264条"
+            },
+            {
+              "article_number": 269,
+              "similarity": 0.6522490978240967,
+              "title": "中华人民共和国刑法 第269条"
+            },
+            {
+              "article_number": 282,
+              "similarity": 0.6284373998641968,
+              "title": "中华人民共和国刑法 第282条"
+            },
+            {
+              "article_number": 312,
+              "similarity": 0.6282074451446533,
+              "title": "中华人民共和国刑法 第312条"
+            },
+            {
+              "article_number": 431,
+              "similarity": 0.6002249717712402,
+              "title": "中华人民共和国刑法 第431条"
+            },
+            {
+              "article_number": 25,
+              "similarity": 0.5982767343521118,
+              "title": "中华人民共和国刑法 第25条"
+            },
+            {
+              "article_number": 267,
+              "similarity": 0.5953158736228943,
+              "title": "中华人民共和国刑法 第267条"
+            },
+            {
+              "article_number": 438,
+              "similarity": 0.594697117805481,
+              "title": "中华人民共和国刑法 第438条"
+            },
+            {
+              "article_number": 263,
+              "similarity": 0.5909519195556641,
+              "title": "中华人民共和国刑法 第263条"
+            },
+            {
+              "article_number": 110,
+              "similarity": 0.5830861330032349,
+              "title": "中华人民共和国刑法 第110条"
+            }
+          ],
+          "metrics": {
+            "mrr": 1.0,
+            "precision@1": 1,
+            "precision@3": 1.0,
+            "precision@5": 1.0,
+            "precision@10": 1.0,
+            "hit": true,
+            "encode_time": 0.5918731689453125,
+            "search_time": 0.0031251907348632812
+          }
+        },
+        {
+          "query": "抢劫罪",
+          "expected": [
+            263
+          ],
+          "results": [
+            {
+              "article_number": 263,
+              "similarity": 0.8036396503448486,
+              "title": "中华人民共和国刑法 第263条"
+            },
+            {
+              "article_number": 267,
+              "similarity": 0.7507913708686829,
+              "title": "中华人民共和国刑法 第267条"
+            },
+            {
+              "article_number": 269,
+              "similarity": 0.6743183135986328,
+              "title": "中华人民共和国刑法 第269条"
+            },
+            {
+              "article_number": 264,
+              "similarity": 0.664106011390686,
+              "title": "中华人民共和国刑法 第264条"
+            },
+            {
+              "article_number": 268,
+              "similarity": 0.6625868082046509,
+              "title": "中华人民共和国刑法 第268条"
+            },
+            {
+              "article_number": 226,
+              "similarity": 0.6159332990646362,
+              "title": "中华人民共和国刑法 第226条"
+            },
+            {
+              "article_number": 239,
+              "similarity": 0.5983657240867615,
+              "title": "中华人民共和国刑法 第239条"
+            },
+            {
+              "article_number": 289,
+              "similarity": 0.5957644581794739,
+              "title": "中华人民共和国刑法 第289条"
+            },
+            {
+              "article_number": 438,
+              "similarity": 0.5930059552192688,
+              "title": "中华人民共和国刑法 第438条"
+            },
+            {
+              "article_number": 25,
+              "similarity": 0.5888344049453735,
+              "title": "中华人民共和国刑法 第25条"
+            }
+          ],
+          "metrics": {
+            "mrr": 1.0,
+            "precision@1": 1,
+            "precision@3": 1.0,
+            "precision@5": 1.0,
+            "precision@10": 1.0,
+            "hit": true,
+            "encode_time": 0.5908041000366211,
+            "search_time": 0.0030808448791503906
+          }
+        }
+      ],
+      "中等查询": [
+        {
+          "query": "故意杀人罪的量刑标准",
+          "expected": [
+            232
+          ],
+          "results": [
+            {
+              "article_number": 232,
+              "similarity": 0.8927565813064575,
+              "title": "中华人民共和国刑法 第232条"
+            },
+            {
+              "article_number": 25,
+              "similarity": 0.6575711965560913,
+              "title": "中华人民共和国刑法 第25条"
+            },
+            {
+              "article_number": 260,
+              "similarity": 0.6422768831253052,
+              "title": "中华人民共和国刑法 第260条"
+            },
+            {
+              "article_number": 234,
+              "similarity": 0.6408413648605347,
+              "title": "中华人民共和国刑法 第234条"
+            },
+            {
+              "article_number": 243,
+              "similarity": 0.6117990612983704,
+              "title": "中华人民共和国刑法 第243条"
+            },
+            {
+              "article_number": 69,
+              "similarity": 0.6031734347343445,
+              "title": "中华人民共和国刑法 第69条"
+            },
+            {
+              "article_number": 50,
+              "similarity": 0.5976359844207764,
+              "title": "中华人民共和国刑法 第50条"
+            },
+            {
+              "article_number": 49,
+              "similarity": 0.590320885181427,
+              "title": "中华人民共和国刑法 第49条"
+            },
+            {
+              "article_number": 239,
+              "similarity": 0.5849999189376831,
+              "title": "中华人民共和国刑法 第239条"
+            },
+            {
+              "article_number": 73,
+              "similarity": 0.5784632563591003,
+              "title": "中华人民共和国刑法 第73条"
+            }
+          ],
+          "metrics": {
+            "mrr": 1.0,
+            "precision@1": 1,
+            "precision@3": 1.0,
+            "precision@5": 1.0,
+            "precision@10": 1.0,
+            "hit": true,
+            "encode_time": 0.5972239971160889,
+            "search_time": 0.0028908252716064453
+          }
+        },
+        {
+          "query": "盗窃罪的立案标准是什么",
+          "expected": [
+            264
+          ],
+          "results": [
+            {
+              "article_number": 264,
+              "similarity": 0.7444392442703247,
+              "title": "中华人民共和国刑法 第264条"
+            },
+            {
+              "article_number": 269,
+              "similarity": 0.6346709132194519,
+              "title": "中华人民共和国刑法 第269条"
+            },
+            {
+              "article_number": 282,
+              "similarity": 0.5987564325332642,
+              "title": "中华人民共和国刑法 第282条"
+            },
+            {
+              "article_number": 312,
+              "similarity": 0.5958234071731567,
+              "title": "中华人民共和国刑法 第312条"
+            },
+            {
+              "article_number": 268,
+              "similarity": 0.5911453366279602,
+              "title": "中华人民共和国刑法 第268条"
+            },
+            {
+              "article_number": 267,
+              "similarity": 0.5880700349807739,
+              "title": "中华人民共和国刑法 第267条"
+            },
+            {
+              "article_number": 45,
+              "similarity": 0.5785616040229797,
+              "title": "中华人民共和国刑法 第45条"
+            },
+            {
+              "article_number": 12,
+              "similarity": 0.5717413425445557,
+              "title": "中华人民共和国刑法 第12条"
+            },
+            {
+              "article_number": 287,
+              "similarity": 0.5704816579818726,
+              "title": "中华人民共和国刑法 第287条"
+            },
+            {
+              "article_number": 431,
+              "similarity": 0.5659181475639343,
+              "title": "中华人民共和国刑法 第431条"
+            }
+          ],
+          "metrics": {
+            "mrr": 1.0,
+            "precision@1": 1,
+            "precision@3": 1.0,
+            "precision@5": 1.0,
+            "precision@10": 1.0,
+            "hit": true,
+            "encode_time": 0.5970263481140137,
+            "search_time": 0.0020051002502441406
+          }
+        },
+        {
+          "query": "交通肇事后逃逸如何处罚",
+          "expected": [
+            133
+          ],
+          "results": [
+            {
+              "article_number": 133,
+              "similarity": 0.8356633186340332,
+              "title": "中华人民共和国刑法 第133条"
+            },
+            {
+              "article_number": 233,
+              "similarity": 0.5592785477638245,
+              "title": "中华人民共和国刑法 第233条"
+            },
+            {
+              "article_number": 198,
+              "similarity": 0.5439002513885498,
+              "title": "中华人民共和国刑法 第198条"
+            },
+            {
+              "article_number": 235,
+              "similarity": 0.508571445941925,
+              "title": "中华人民共和国刑法 第235条"
+            },
+            {
+              "article_number": 52,
+              "similarity": 0.5014643669128418,
+              "title": "中华人民共和国刑法 第52条"
+            },
+            {
+              "article_number": 42,
+              "similarity": 0.49168282747268677,
+              "title": "中华人民共和国刑法 第42条"
+            },
+            {
+              "article_number": 37,
+              "similarity": 0.4816206693649292,
+              "title": "中华人民共和国刑法 第37条"
+            },
+            {
+              "article_number": 199,
+              "similarity": 0.473108172416687,
+              "title": "中华人民共和国刑法 第199条"
+            },
+            {
+              "article_number": 293,
+              "similarity": 0.4658239483833313,
+              "title": "中华人民共和国刑法 第293条"
+            },
+            {
+              "article_number": 73,
+              "similarity": 0.46192485094070435,
+              "title": "中华人民共和国刑法 第73条"
+            }
+          ],
+          "metrics": {
+            "mrr": 1.0,
+            "precision@1": 1,
+            "precision@3": 1.0,
+            "precision@5": 1.0,
+            "precision@10": 1.0,
+            "hit": true,
+            "encode_time": 0.601107120513916,
+            "search_time": 0.003087282180786133
+          }
+        },
+        {
+          "query": "诈骗罪数额特别巨大的量刑",
+          "expected": [
+            266
+          ],
+          "results": [
+            {
+              "article_number": 266,
+              "similarity": 0.8120656609535217,
+              "title": "中华人民共和国刑法 第266条"
+            },
+            {
+              "article_number": 224,
+              "similarity": 0.7164856791496277,
+              "title": "中华人民共和国刑法 第224条"
+            },
+            {
+              "article_number": 192,
+              "similarity": 0.686686635017395,
+              "title": "中华人民共和国刑法 第192条"
+            },
+            {
+              "article_number": 198,
+              "similarity": 0.669173002243042,
+              "title": "中华人民共和国刑法 第198条"
+            },
+            {
+              "article_number": 193,
+              "similarity": 0.6513800621032715,
+              "title": "中华人民共和国刑法 第193条"
+            },
+            {
+              "article_number": 372,
+              "similarity": 0.6253926157951355,
+              "title": "中华人民共和国刑法 第372条"
+            },
+            {
+              "article_number": 194,
+              "similarity": 0.6195145845413208,
+              "title": "中华人民共和国刑法 第194条"
+            },
+            {
+              "article_number": 279,
+              "similarity": 0.6169055104255676,
+              "title": "中华人民共和国刑法 第279条"
+            },
+            {
+              "article_number": 45,
+              "similarity": 0.6104414463043213,
+              "title": "中华人民共和国刑法 第45条"
+            },
+            {
+              "article_number": 195,
+              "similarity": 0.6074705123901367,
+              "title": "中华人民共和国刑法 第195条"
+            }
+          ],
+          "metrics": {
+            "mrr": 1.0,
+            "precision@1": 1,
+            "precision@3": 1.0,
+            "precision@5": 1.0,
+            "precision@10": 1.0,
+            "hit": true,
+            "encode_time": 0.5839741230010986,
+            "search_time": 0.003978729248046875
+          }
+        }
+      ],
+      "复杂查询": [
+        {
+          "query": "未成年人故意伤害他人致人重伤的刑事责任",
+          "expected": [
+            234,
+            17
+          ],
+          "results": [
+            {
+              "article_number": 234,
+              "similarity": 0.795525312423706,
+              "title": "中华人民共和国刑法 第234条"
+            },
+            {
+              "article_number": 235,
+              "similarity": 0.7583651542663574,
+              "title": "中华人民共和国刑法 第235条"
+            },
+            {
+              "article_number": 95,
+              "similarity": 0.6536094546318054,
+              "title": "中华人民共和国刑法 第95条"
+            },
+            {
+              "article_number": 17,
+              "similarity": 0.6070653200149536,
+              "title": "中华人民共和国刑法 第17条"
+            },
+            {
+              "article_number": 293,
+              "similarity": 0.6007684469223022,
+              "title": "中华人民共和国刑法 第293条"
+            },
+            {
+              "article_number": 29,
+              "similarity": 0.5950195789337158,
+              "title": "中华人民共和国刑法 第29条"
+            },
+            {
+              "article_number": 232,
+              "similarity": 0.5932952165603638,
+              "title": "中华人民共和国刑法 第232条"
+            },
+            {
+              "article_number": 233,
+              "similarity": 0.5777978897094727,
+              "title": "中华人民共和国刑法 第233条"
+            },
+            {
+              "article_number": 16,
+              "similarity": 0.576886773109436,
+              "title": "中华人民共和国刑法 第16条"
+            },
+            {
+              "article_number": 243,
+              "similarity": 0.5712046027183533,
+              "title": "中华人民共和国刑法 第243条"
+            }
+          ],
+          "metrics": {
+            "mrr": 1.0,
+            "precision@1": 1,
+            "precision@3": 0.5,
+            "precision@5": 1.0,
+            "precision@10": 1.0,
+            "hit": true,
+            "encode_time": 0.5575015544891357,
+            "search_time": 0.0030853748321533203
+          }
+        },
+        {
+          "query": "入户盗窃携带凶器的法律后果",
+          "expected": [
+            264
+          ],
+          "results": [
+            {
+              "article_number": 127,
+              "similarity": 0.7595086097717285,
+              "title": "中华人民共和国刑法 第127条"
+            },
+            {
+              "article_number": 269,
+              "similarity": 0.7462984323501587,
+              "title": "中华人民共和国刑法 第269条"
+            },
+            {
+              "article_number": 264,
+              "similarity": 0.721879243850708,
+              "title": "中华人民共和国刑法 第264条"
+            },
+            {
+              "article_number": 263,
+              "similarity": 0.6928750276565552,
+              "title": "中华人民共和国刑法 第263条"
+            },
+            {
+              "article_number": 438,
+              "similarity": 0.6858322024345398,
+              "title": "中华人民共和国刑法 第438条"
+            },
+            {
+              "article_number": 267,
+              "similarity": 0.6693336963653564,
+              "title": "中华人民共和国刑法 第267条"
+            },
+            {
+              "article_number": 130,
+              "similarity": 0.6487462520599365,
+              "title": "中华人民共和国刑法 第130条"
+            },
+            {
+              "article_number": 289,
+              "similarity": 0.6195788979530334,
+              "title": "中华人民共和国刑法 第289条"
+            },
+            {
+              "article_number": 268,
+              "similarity": 0.6168733835220337,
+              "title": "中华人民共和国刑法 第268条"
+            },
+            {
+              "article_number": 128,
+              "similarity": 0.609026312828064,
+              "title": "中华人民共和国刑法 第128条"
+            }
+          ],
+          "metrics": {
+            "mrr": 0.3333333333333333,
+            "precision@1": 0,
+            "precision@3": 1.0,
+            "precision@5": 1.0,
+            "precision@10": 1.0,
+            "hit": true,
+            "encode_time": 0.8372514247894287,
+            "search_time": 0.004273176193237305
+          }
+        },
+        {
+          "query": "聚众斗殴致人重伤死亡的定罪量刑",
+          "expected": [
+            292,
+            234,
+            232
+          ],
+          "results": [
+            {
+              "article_number": 292,
+              "similarity": 0.7427592277526855,
+              "title": "中华人民共和国刑法 第292条"
+            },
+            {
+              "article_number": 234,
+              "similarity": 0.7217518091201782,
+              "title": "中华人民共和国刑法 第234条"
+            },
+            {
+              "article_number": 235,
+              "similarity": 0.686349093914032,
+              "title": "中华人民共和国刑法 第235条"
+            },
+            {
+              "article_number": 293,
+              "similarity": 0.6824538111686707,
+              "title": "中华人民共和国刑法 第293条"
+            },
+            {
+              "article_number": 232,
+              "similarity": 0.6662400364875793,
+              "title": "中华人民共和国刑法 第232条"
+            },
+            {
+              "article_number": 233,
+              "similarity": 0.6356507539749146,
+              "title": "中华人民共和国刑法 第233条"
+            },
+            {
+              "article_number": 290,
+              "similarity": 0.605029821395874,
+              "title": "中华人民共和国刑法 第290条"
+            },
+            {
+              "article_number": 246,
+              "similarity": 0.6032660603523254,
+              "title": "中华人民共和国刑法 第246条"
+            },
+            {
+              "article_number": 95,
+              "similarity": 0.5882630348205566,
+              "title": "中华人民共和国刑法 第95条"
+            },
+            {
+              "article_number": 226,
+              "similarity": 0.5822303295135498,
+              "title": "中华人民共和国刑法 第226条"
+            }
+          ],
+          "metrics": {
+            "mrr": 1.0,
+            "precision@1": 1,
+            "precision@3": 0.6666666666666666,
+            "precision@5": 1.0,
+            "precision@10": 1.0,
+            "hit": true,
+            "encode_time": 0.6089990139007568,
+            "search_time": 0.0032405853271484375
+          }
+        }
+      ],
+      "语义查询": [
+        {
+          "query": "杀人后自首会减轻处罚吗",
+          "expected": [
+            232,
+            67
+          ],
+          "results": [
+            {
+              "article_number": 232,
+              "similarity": 0.660760760307312,
+              "title": "中华人民共和国刑法 第232条"
+            },
+            {
+              "article_number": 27,
+              "similarity": 0.6508205533027649,
+              "title": "中华人民共和国刑法 第27条"
+            },
+            {
+              "article_number": 25,
+              "similarity": 0.6333420276641846,
+              "title": "中华人民共和国刑法 第25条"
+            },
+            {
+              "article_number": 67,
+              "similarity": 0.6320474147796631,
+              "title": "中华人民共和国刑法 第67条"
+            },
+            {
+              "article_number": 74,
+              "similarity": 0.6319178342819214,
+              "title": "中华人民共和国刑法 第74条"
+            },
+            {
+              "article_number": 113,
+              "similarity": 0.5972793102264404,
+              "title": "中华人民共和国刑法 第113条"
+            },
+            {
+              "article_number": 63,
+              "similarity": 0.5881743431091309,
+              "title": "中华人民共和国刑法 第63条"
+            },
+            {
+              "article_number": 52,
+              "similarity": 0.580583930015564,
+              "title": "中华人民共和国刑法 第52条"
+            },
+            {
+              "article_number": 310,
+              "similarity": 0.5651977062225342,
+              "title": "中华人民共和国刑法 第310条"
+            },
+            {
+              "article_number": 62,
+              "similarity": 0.5630778074264526,
+              "title": "中华人民共和国刑法 第62条"
+            }
+          ],
+          "metrics": {
+            "mrr": 1.0,
+            "precision@1": 1,
+            "precision@3": 0.5,
+            "precision@5": 1.0,
+            "precision@10": 1.0,
+            "hit": true,
+            "encode_time": 0.5645730495452881,
+            "search_time": 0.0034160614013671875
+          }
+        },
+        {
+          "query": "偷东西被抓现行怎么判",
+          "expected": [
+            264
+          ],
+          "results": [
+            {
+              "article_number": 269,
+              "similarity": 0.645758867263794,
+              "title": "中华人民共和国刑法 第269条"
+            },
+            {
+              "article_number": 264,
+              "similarity": 0.6342906355857849,
+              "title": "中华人民共和国刑法 第264条"
+            },
+            {
+              "article_number": 245,
+              "similarity": 0.6168418526649475,
+              "title": "中华人民共和国刑法 第245条"
+            },
+            {
+              "article_number": 267,
+              "similarity": 0.6014134883880615,
+              "title": "中华人民共和国刑法 第267条"
+            },
+            {
+              "article_number": 268,
+              "similarity": 0.5856020450592041,
+              "title": "中华人民共和国刑法 第268条"
+            },
+            {
+              "article_number": 263,
+              "similarity": 0.5848490595817566,
+              "title": "中华人民共和国刑法 第263条"
+            },
+            {
+              "article_number": 226,
+              "similarity": 0.5656553506851196,
+              "title": "中华人民共和国刑法 第226条"
+            },
+            {
+              "article_number": 238,
+              "similarity": 0.559159517288208,
+              "title": "中华人民共和国刑法 第238条"
+            },
+            {
+              "article_number": 316,
+              "similarity": 0.5586565136909485,
+              "title": "中华人民共和国刑法 第316条"
+            },
+            {
+              "article_number": 318,
+              "similarity": 0.5526975393295288,
+              "title": "中华人民共和国刑法 第318条"
+            }
+          ],
+          "metrics": {
+            "mrr": 0.5,
+            "precision@1": 0,
+            "precision@3": 1.0,
+            "precision@5": 1.0,
+            "precision@10": 1.0,
+            "hit": true,
+            "encode_time": 0.5013763904571533,
+            "search_time": 0.0023832321166992188
+          }
+        },
+        {
+          "query": "酒后开车撞死人要坐牢多久",
+          "expected": [
+            133
+          ],
+          "results": [
+            {
+              "article_number": 133,
+              "similarity": 0.6307700872421265,
+              "title": "中华人民共和国刑法 第133条"
+            },
+            {
+              "article_number": 233,
+              "similarity": 0.6121063232421875,
+              "title": "中华人民共和国刑法 第233条"
+            },
+            {
+              "article_number": 232,
+              "similarity": 0.6062788963317871,
+              "title": "中华人民共和国刑法 第232条"
+            },
+            {
+              "article_number": 69,
+              "similarity": 0.5714232921600342,
+              "title": "中华人民共和国刑法 第69条"
+            },
+            {
+              "article_number": 57,
+              "similarity": 0.5641252398490906,
+              "title": "中华人民共和国刑法 第57条"
+            },
+            {
+              "article_number": 73,
+              "similarity": 0.5636316537857056,
+              "title": "中华人民共和国刑法 第73条"
+            },
+            {
+              "article_number": 310,
+              "similarity": 0.5513923168182373,
+              "title": "中华人民共和国刑法 第310条"
+            },
+            {
+              "article_number": 42,
+              "similarity": 0.5500109195709229,
+              "title": "中华人民共和国刑法 第42条"
+            },
+            {
+              "article_number": 235,
+              "similarity": 0.5492210388183594,
+              "title": "中华人民共和国刑法 第235条"
+            },
+            {
+              "article_number": 80,
+              "similarity": 0.5280410051345825,
+              "title": "中华人民共和国刑法 第80条"
+            }
+          ],
+          "metrics": {
+            "mrr": 1.0,
+            "precision@1": 1,
+            "precision@3": 1.0,
+            "precision@5": 1.0,
+            "precision@10": 1.0,
+            "hit": true,
+            "encode_time": 0.523369312286377,
+            "search_time": 0.002237558364868164
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "stage": "s2_checklist",
+  "output_data": {
+    "crime": "故意伤害罪",
+    "checklist": [
+      {
+        "key": "injury_level",
+        "label": "伤情等级",
+        "question": "受害人的伤情鉴定结果是轻伤几级？",
+        "importance": "high"
+      },
+      {
+        "key": "first_hit",
+        "label": "是否先动手",
+        "question": "是您先动手打人还是对方先动手？",
+        "importance": "high"
+      },
+      {
+        "key": "weapon",
+        "label": "是否使用凶器",
+        "question": "您是否使用了刀、棍棒等凶器？",
+        "importance": "high"
+      },
+      {
+        "key": "surrender",
+        "label": "自首投案",
+        "question": "案发后您是主动报警并留在现场等待，还是被抓获的？",
+        "importance": "high"
+      },
+      {
+        "key": "compensation",
+        "label": "赔偿谅解",
+        "question": "您是否已赔偿被害人并取得其书面谅解？",
+        "importance": "high"
+      },
+      {
+        "key": "guilty_plea",
+        "label": "认罪认罚",
+        "question": "您是否愿意认罪认罚？",
+        "importance": "medium"
+      },
+      {
+        "key": "prior_record",
+        "label": "前科记录",
+        "question": "您之前是否有犯罪前科或行政处罚记录？",
+        "importance": "medium"
+      },
+      {
+        "key": "provocation",
+        "label": "被害人过错",
+        "question": "被害人是否有挑衅、辱骂等过错行为？",
+        "importance": "medium"
+      }
+    ]
+  }
+}

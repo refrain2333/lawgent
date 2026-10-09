@@ -1,0 +1,137 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Legal Services 专属配色：Navy Blue + Gold + White */
+    /* 来源：ui-ux-pro-max colors.csv #42 Legal Services */
+
+    --background: 210 40% 98%;       /* #F8FAFC 纯净白 */
+    --foreground: 222 47% 11%;       /* #0F172A 深墨色 */
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+
+    --border: 215 20% 84%;           /* #CBD5E1 浅蓝灰边框 */
+    --input: 215 20% 84%;
+
+    /* 主色：深海军蓝 — 权威、信任 */
+    --primary: 224 64% 33%;          /* #1E3A8A */
+    --primary-foreground: 0 0% 100%;
+
+    /* 次要色 */
+    --secondary: 215 20% 93%;
+    --secondary-foreground: 222 47% 20%;
+
+    /* 静音色 */
+    --muted: 215 20% 95%;
+    --muted-foreground: 215 14% 48%;
+
+    /* 强调色：金色 CTA — 专业、高端 */
+    --accent: 27 90% 95%;            /* 金色浅底 */
+    --accent-foreground: 27 90% 32%; /* #B45309 深金 */
+
+    /* CTA 金色（用于特殊按钮） */
+    --cta: 27 90% 37%;               /* #B45309 */
+    --cta-foreground: 0 0% 100%;
+
+    --destructive: 4 72% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --ring: 224 64% 33%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 222 47% 7%;
+    --foreground: 215 20% 92%;
+
+    --card: 222 38% 16%;          /* 比 muted 亮，选中态可见 */
+    --card-foreground: 215 20% 92%;
+
+    --border: 222 28% 24%;
+    --input: 222 28% 24%;
+
+    --primary: 224 71% 55%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 222 30% 20%;
+    --secondary-foreground: 215 18% 72%;
+
+    --muted: 222 30% 11%;         /* 比 card 暗，作为 Tab 容器背景 */
+    --muted-foreground: 215 14% 58%;
+
+    --accent: 27 60% 18%;
+    --accent-foreground: 27 90% 65%;
+
+    --cta: 27 80% 48%;
+    --cta-foreground: 0 0% 100%;
+
+    --destructive: 4 65% 52%;
+    --destructive-foreground: 0 0% 100%;
+
+    --ring: 224 71% 55%;
+  }
+}
+
+@layer base {
+  * { @apply border-border; }
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    scroll-behavior: smooth;
+    scrollbar-gutter: stable both-edges;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', sans-serif;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+  h1, h2, h3 {
+    font-family: 'Playfair Display', serif;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+}
+
+/* 流式打字光标 */
+.typing-cursor::after {
+  content: '▋';
+  @apply animate-[caret-blink_1.25s_ease-out_infinite] text-primary;
+}
+
+/* 滚动条 */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { @apply bg-transparent; }
+::-webkit-scrollbar-thumb { @apply bg-border rounded-full; }
+::-webkit-scrollbar-thumb:hover { @apply bg-muted-foreground/30; }
+
+/* 渐入 */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in { animation: fade-in 0.2s ease-out both; }
+
+/* 气泡进入 */
+@keyframes bubble-in-left {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes bubble-in-right {
+  from { opacity: 0; transform: translateX(8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.bubble-left  { animation: bubble-in-left  0.18s ease-out both; }
+.bubble-right { animation: bubble-in-right 0.18s ease-out both; }
+
+/* prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
