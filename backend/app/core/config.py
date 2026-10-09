@@ -2,9 +2,12 @@
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _ENV_FILE = Path(__file__).parent.parent.parent / ".env"
+
+_DEFAULT_JWT_SECRET = "lawgent-secret-key-change-in-production"
 
 
 class Settings(BaseSettings):
@@ -20,9 +23,12 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/lawgent"
 
     # JWT 配置
-    JWT_SECRET: str = "lawgent-secret-key-change-in-production"
+    JWT_SECRET: str = _DEFAULT_JWT_SECRET
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_MINUTES: int = 1440
+
+    # CORS：允许的前端来源，多个用英文逗号分隔。默认仅本地开发地址。
+    CORS_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173"
 
     # 数据路径配置
     DATA_VECTORS_PATH: str = "data/vectors"
@@ -41,6 +47,14 @@ class Settings(BaseSettings):
     HF_HOME: str = ""
     EMBEDDING_DIM: int = 768
     CACHE_SIZE_LIMIT: int = 1000
+
+    @model_validator(mode="after")
+    def _check_secret(self) -> "Settings":
+        if not self.DEBUG and self.JWT_SECRET == _DEFAULT_JWT_SECRET:
+            raise ValueError(
+                "检测到生产模式仍在使用默认 JWT_SECRET，请在 .env 中设置一个随机密钥。"
+            )
+        return self
 
 
 @lru_cache

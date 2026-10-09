@@ -12,7 +12,7 @@ from app.agent.service.s1 import chat_s1, chat_s1_confirming, check_sufficient, 
 from app.agent.service.s2 import gen_checklist, run_s2
 from app.agent.service.s3 import chat_s3
 from app.agent.service.s4 import chat_s4, gen_report
-from app.core.deps import get_user_id_from_query
+from app.core.deps import get_user_id
 from app.core.logger import logger
 from app.db.database import get_db
 from app.models.models import Conversation, ConversationStage, Message, MessageRole, StageConfirmation, StageType
@@ -56,7 +56,7 @@ async def _get_stage_confirmation(conv_id: int, stage: StageType, db: AsyncSessi
 
 @router.get("/conversations", summary="获取当前用户会话列表")
 async def list_conversations(
-    user_id: int = Depends(get_user_id_from_query),
+    user_id: int = Depends(get_user_id),
     db: AsyncSession = Depends(get_db),
     ):
     """返回当前用户的历史会话列表"""
@@ -68,7 +68,7 @@ async def list_conversations(
 @router.get("/conversations/{thread_id}/messages", summary="获取会话历史消息")
 async def get_conversation_messages(
     thread_id: str,
-    user_id: int = Depends(get_user_id_from_query),
+    user_id: int = Depends(get_user_id),
     db: AsyncSession = Depends(get_db),
     ):
     """返回指定会话的历史消息列表"""
@@ -81,7 +81,7 @@ async def get_conversation_messages(
 @router.post("/sessions", summary="创建会话")
 async def create_session(
     body: SessionCreateRequest,
-    user_id: int = Depends(get_user_id_from_query),
+    user_id: int = Depends(get_user_id),
     db: AsyncSession = Depends(get_db),
     ):
     """创建新会话，返回 thread_id"""
@@ -94,7 +94,7 @@ async def create_session(
 @router.get("/sessions/{thread_id}/state", summary="查询会话当前状态")
 async def get_session_state(
     thread_id: str,
-    user_id: int = Depends(get_user_id_from_query),
+    user_id: int = Depends(get_user_id),
     db: AsyncSession = Depends(get_db),
     ):
     """返回当前阶段，confirming 阶段额外返回摘要供前端恢复确认卡片"""
@@ -141,7 +141,7 @@ async def get_session_state(
 async def send_message(
     thread_id: str,
     body: MessageRequest,
-    user_id: int = Depends(get_user_id_from_query),
+    user_id: int = Depends(get_user_id),
     db: AsyncSession = Depends(get_db),
     ):
     """根据当前阶段路由到对应处理函数"""
@@ -201,12 +201,7 @@ async def send_message(
         finally:
             # 无论是否中途断流，已收到的内容都存库
             if ai_content:
-                full_content = "".join(ai_content)
-                for signal in ("[[CASE_READY]]", "[[S3_READY]]"):
-                    idx = full_content.find(signal)
-                    if idx != -1:
-                        full_content = full_content[:idx].rstrip()
-                        break
+                full_content = "".join(ai_content).strip()
                 if full_content:
                     await conversation_service.save_message(conv.id, "assistant", full_content, conv.stage)
 
@@ -239,7 +234,7 @@ async def send_message(
 @router.delete("/conversations/{thread_id}", summary="删除会话")
 async def delete_conversation(
     thread_id: str,
-    user_id: int = Depends(get_user_id_from_query),
+    user_id: int = Depends(get_user_id),
     db: AsyncSession = Depends(get_db),
     ):
     """删除会话及其全部消息和阶段数据"""
@@ -253,7 +248,7 @@ async def delete_conversation(
 @router.get("/sessions/{thread_id}/report", summary="获取S4风险评估报告")
 async def get_report(
     thread_id: str,
-    user_id: int = Depends(get_user_id_from_query),
+    user_id: int = Depends(get_user_id),
     db: AsyncSession = Depends(get_db),
     ):
     """返回S4阶段生成的风险评估报告"""
@@ -269,7 +264,7 @@ async def get_report(
 @router.post("/sessions/{thread_id}/advance", summary="推进阶段")
 async def advance_stage(
     thread_id: str,
-    user_id: int = Depends(get_user_id_from_query),
+    user_id: int = Depends(get_user_id),
     db: AsyncSession = Depends(get_db),
     ):
     """S1收集完毕时，AI判断信息是否足够；S3信号失效时手动推进"""
@@ -334,7 +329,7 @@ async def advance_stage(
 async def confirm_stage(
     thread_id: str,
     body: ConfirmRequest,
-    user_id: int = Depends(get_user_id_from_query),
+    user_id: int = Depends(get_user_id),
     db: AsyncSession = Depends(get_db),
     ):
     """卡点确认：accepted=true 推进阶段，false 回退重新收集"""

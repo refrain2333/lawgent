@@ -105,12 +105,16 @@ export const useChatStore = defineStore('chat', () => {
 
   function _token() { return useAuthStore().token ?? '' }
   function _apiBase() { return '/api/v1/agent' }
+  function _authHeaders(): Record<string, string> {
+    const t = _token()
+    return t ? { Authorization: `Bearer ${t}` } : {}
+  }
 
   async function connect(convId?: string) {
     reset()
     if (convId) {
       // 恢复已有会话：查询状态
-      const res = await fetch(`${_apiBase()}/sessions/${convId}/state?token=${_token()}`)
+      const res = await fetch(`${_apiBase()}/sessions/${convId}/state`, { headers: _authHeaders() })
       if (!res.ok) return
       const data = await res.json()
       conversationId.value = data.thread_id
@@ -134,7 +138,7 @@ export const useChatStore = defineStore('chat', () => {
       // 恢复 S4 报告 / 生成中状态
       if (data.stage === 's4_done') {
         try {
-          const reportRes = await fetch(`${_apiBase()}/sessions/${convId}/report?token=${_token()}`)
+          const reportRes = await fetch(`${_apiBase()}/sessions/${convId}/report`, { headers: _authHeaders() })
           if (reportRes.ok) {
             report.value = await reportRes.json()
             isS4Waiting.value = false
@@ -154,9 +158,9 @@ export const useChatStore = defineStore('chat', () => {
       }
     } else {
       // 新建会话
-      const res = await fetch(`${_apiBase()}/sessions?token=${_token()}`, {
+      const res = await fetch(`${_apiBase()}/sessions`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ..._authHeaders() },
         body: JSON.stringify({}),
       })
       if (!res.ok) return
@@ -198,9 +202,6 @@ export const useChatStore = defineStore('chat', () => {
       const finish = () => {
         const msg = messages.value.find(m => m.id === msgId)
         if (msg) {
-          // 清除气泡中意外推送的信号文字及之后内容
-          const sigIdx = msg.content.indexOf('[[CASE_READY]]')
-          if (sigIdx !== -1) msg.content = msg.content.slice(0, sigIdx).trimEnd()
           msg.streaming = false
         }
         dbStage.value = 's1_confirming'
@@ -223,8 +224,6 @@ export const useChatStore = defineStore('chat', () => {
       const finish = () => {
         const msg = messages.value.find(m => m.id === msgId)
         if (msg) {
-          const sigIdx = msg.content.indexOf('[[S3_READY]]')
-          if (sigIdx !== -1) msg.content = msg.content.slice(0, sigIdx).trimEnd()
           msg.streaming = false
         }
         dbStage.value = 's3_confirming'
@@ -279,7 +278,7 @@ export const useChatStore = defineStore('chat', () => {
     try {
       const res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ..._authHeaders() },
         body: JSON.stringify(body),
         signal: abortController.signal,
       })
@@ -308,7 +307,7 @@ export const useChatStore = defineStore('chat', () => {
     if (!conversationId.value) return
     messages.value.push({ id: crypto.randomUUID(), role: 'user', content: text, stage: dbStage.value })
     await _readStream(
-      `${_apiBase()}/sessions/${conversationId.value}/message?token=${_token()}`,
+      `${_apiBase()}/sessions/${conversationId.value}/message`,
       { content: text },
     )
   }
@@ -318,8 +317,8 @@ export const useChatStore = defineStore('chat', () => {
     if (!conversationId.value) return
     isThinking.value = true
     const res = await fetch(
-      `${_apiBase()}/sessions/${conversationId.value}/advance?token=${_token()}`,
-      { method: 'POST' },
+      `${_apiBase()}/sessions/${conversationId.value}/advance`,
+      { method: 'POST', headers: _authHeaders() },
     )
     isThinking.value = false
     if (!res.ok) return
@@ -347,10 +346,10 @@ export const useChatStore = defineStore('chat', () => {
     confirmRequest.value = null
 
     const res = await fetch(
-      `${_apiBase()}/sessions/${conversationId.value}/confirm?token=${_token()}`,
+      `${_apiBase()}/sessions/${conversationId.value}/confirm`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ..._authHeaders() },
         body: JSON.stringify({ accepted }),
       },
     )
@@ -392,7 +391,7 @@ export const useChatStore = defineStore('chat', () => {
       const currentThreadId = conversationId.value
       if (!currentThreadId) return
       try {
-        const res = await fetch(`${_apiBase()}/sessions/${currentThreadId}/state?token=${_token()}`)
+        const res = await fetch(`${_apiBase()}/sessions/${currentThreadId}/state`, { headers: _authHeaders() })
         if (!res.ok) return
         const data = await res.json()
 
@@ -445,7 +444,7 @@ export const useChatStore = defineStore('chat', () => {
       await new Promise(r => setTimeout(r, 3000))
       if (pollToken !== s4PollToken || conversationId.value !== threadId) return
       try {
-        const res = await fetch(`${_apiBase()}/sessions/${threadId}/report?token=${_token()}`)
+        const res = await fetch(`${_apiBase()}/sessions/${threadId}/report`, { headers: _authHeaders() })
         if (pollToken !== s4PollToken || conversationId.value !== threadId) return
         if (res.ok) {
           report.value = await res.json()
@@ -456,7 +455,7 @@ export const useChatStore = defineStore('chat', () => {
         }
 
         // 报告尚未就绪时，查询阶段判断是否失败或仍在生成
-        const stateRes = await fetch(`${_apiBase()}/sessions/${threadId}/state?token=${_token()}`)
+        const stateRes = await fetch(`${_apiBase()}/sessions/${threadId}/state`, { headers: _authHeaders() })
         if (pollToken !== s4PollToken || conversationId.value !== threadId) return
         if (stateRes.ok) {
           const stateData = await stateRes.json()
@@ -489,8 +488,9 @@ export const useChatStore = defineStore('chat', () => {
     const auth = useAuthStore()
     if (!auth.token) return false
     try {
-      const res = await fetch(`${_apiBase()}/conversations/${threadId}?token=${auth.token}`, {
+      const res = await fetch(`${_apiBase()}/conversations/${threadId}`, {
         method: 'DELETE',
+        headers: _authHeaders(),
       })
       if (!res.ok) return false
       conversations.value = conversations.value.filter(c => c.thread_id !== threadId)
@@ -508,7 +508,7 @@ export const useChatStore = defineStore('chat', () => {
     if (!targetThreadId) return null
 
     try {
-      const res = await fetch(`${_apiBase()}/sessions/${targetThreadId}/state?token=${_token()}`)
+      const res = await fetch(`${_apiBase()}/sessions/${targetThreadId}/state`, { headers: _authHeaders() })
       if (!res.ok) return null
       const data = await res.json()
       if (conversationId.value !== targetThreadId) return data
@@ -537,7 +537,7 @@ export const useChatStore = defineStore('chat', () => {
     if (!auth.token) return
     isFetchingConversations.value = true
     try {
-      const res = await fetch(`${_apiBase()}/conversations?token=${auth.token}`)
+      const res = await fetch(`${_apiBase()}/conversations`, { headers: _authHeaders() })
       if (res.ok) {
         conversations.value = await res.json()
       }
@@ -552,7 +552,7 @@ export const useChatStore = defineStore('chat', () => {
     if (!auth.token) return
     isLoading.value = true
     try {
-      const res = await fetch(`${_apiBase()}/conversations/${threadId}/messages?token=${auth.token}`)
+      const res = await fetch(`${_apiBase()}/conversations/${threadId}/messages`, { headers: _authHeaders() })
       const data: { role: string; content: string; stage?: string }[] = await res.json()
       messages.value = data.map(m => ({
         id: crypto.randomUUID(),

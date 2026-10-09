@@ -75,7 +75,6 @@ def log_ai_call(
     now = datetime.now()
     mm = now.strftime("%m")
     dd = now.strftime("%d")
-    now.strftime("%Y-%m-%d")
 
     log_dir = BASE_LOG_DIR / "ai" / mm / dd
     log_dir.mkdir(parents=True, exist_ok=True)

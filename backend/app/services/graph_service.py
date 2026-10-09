@@ -146,21 +146,11 @@ def get_relation_cases(crime: str, article: str, limit: int) -> RelationCasesRes
                 articles = case.get("relevant_articles", [])
                 fact = case.get("fact", "")
                 case_id = str(case.get("case_id", ""))
-                si = case.get("sentence_info", {}) or {}
-                si.get("imprisonment_months") if isinstance(si, dict) else None
-                si.get("fine_amount") if isinstance(si, dict) else None
-                bool(si.get("death_penalty", False)) if isinstance(si, dict) else False
-                bool(si.get("life_imprisonment", False)) if isinstance(si, dict) else False
             else:
                 accusations = getattr(case, "accusations", []) or []
                 articles = getattr(case, "relevant_articles", []) or []
                 fact = getattr(case, "fact", "") or ""
                 case_id = str(getattr(case, "case_id", ""))
-                si = getattr(case, "sentence_info", None)
-                getattr(si, "imprisonment_months", None) if si else getattr(case, "imprisonment_months", None)
-                getattr(si, "fine_amount", None) if si else getattr(case, "punish_of_money", None)
-                bool(getattr(si, "death_penalty", False) if si else getattr(case, "death_penalty", False))
-                bool(getattr(si, "life_imprisonment", False) if si else getattr(case, "life_imprisonment", False))
 
             crime_match = any(
                 crime_normalized in str(acc).replace("罪", "") or str(acc).replace("罪", "") in crime_normalized
