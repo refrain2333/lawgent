@@ -19,14 +19,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # 清空测试数据
-    conn = op.get_bind()
-    conn.execute(sa.text("DELETE FROM stage_confirmations"))
-    conn.execute(sa.text("DELETE FROM messages"))
-    conn.execute(sa.text("DELETE FROM conversations"))
-    conn.execute(sa.text("DELETE FROM users"))
-
-    # 删除 facts_json 列
+    # 迁移只变更字段，不能将已有用户和咨询记录当作测试数据清空。
     op.drop_column('conversations', 'facts_json')
 
 

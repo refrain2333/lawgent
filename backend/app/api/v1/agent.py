@@ -2,6 +2,9 @@
 import asyncio
 import json
 import uuid
+from collections.abc import Coroutine
+from datetime import timedelta
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
@@ -10,16 +13,55 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agent.service.s1 import chat_s1, chat_s1_confirming, check_sufficient, generate_title
 from app.agent.service.s2 import gen_checklist, run_s2
-from app.agent.service.s3 import chat_s3
+from app.agent.service.s3 import chat_s3, summarize_facts
 from app.agent.service.s4 import chat_s4, gen_report
 from app.core.deps import get_user_id
 from app.core.logger import logger
 from app.db.database import get_db
-from app.models.models import Conversation, ConversationStage, Message, MessageRole, StageConfirmation, StageType
+from app.models.models import (
+    Conversation,
+    ConversationStage,
+    Message,
+    MessageRole,
+    StageConfirmation,
+    StageType,
+    utc_now,
+)
 from app.schemas.v1.agent import ConfirmRequest, MessageRequest, SessionCreateRequest
 from app.services import conversation_service
 
 router = APIRouter(tags=["Agent"])
+_background_tasks: set[asyncio.Task[None]] = set()
+_STAGE_TASK_TIMEOUT = 15 * 60
+_STAGE_RECOVERY_AFTER = timedelta(minutes=30)
+
+
+def _start_background(coro: Coroutine[Any, Any, None]) -> None:
+    """持有任务引用，并消费后台异常以免敏感异常输出到默认日志。"""
+    task = asyncio.create_task(coro)
+    _background_tasks.add(task)
+
+    def done(completed: asyncio.Task[None]) -> None:
+        _background_tasks.discard(completed)
+        if not completed.cancelled() and (error := completed.exception()) is not None:
+            logger.error(f"后台任务未完成: {type(error).__name__}")
+
+    task.add_done_callback(done)
+
+
+async def _run_stage_task(
+    thread_id: str,
+    coro: Coroutine[Any, Any, None],
+    running_stage: ConversationStage,
+    failed_stage: ConversationStage,
+) -> None:
+    try:
+        await asyncio.wait_for(coro, timeout=_STAGE_TASK_TIMEOUT)
+    except (TimeoutError, asyncio.CancelledError) as error:
+        await conversation_service.update_stage(thread_id, failed_stage, expected_stage=running_stage)
+        if isinstance(error, asyncio.CancelledError):
+            raise
+        logger.warning(f"阶段任务超时: thread={thread_id}")
 
 
 async def _get_conv(thread_id: str, user_id: int, db: AsyncSession) -> Conversation:
@@ -99,6 +141,19 @@ async def get_session_state(
     ):
     """返回当前阶段，confirming 阶段额外返回摘要供前端恢复确认卡片"""
     conv = await _get_conv(thread_id, user_id, db)
+    failed_stage = {
+        ConversationStage.S2_SEARCHING: ConversationStage.S2_FAILED,
+        ConversationStage.S4_GENERATING: ConversationStage.S4_FAILED,
+    }.get(conv.stage)
+    if failed_stage is not None:
+        # 恢复窗口长于运行时限；条件更新避免过期轮询误伤刚重试的任务。
+        changed = await conversation_service.update_stage(
+            thread_id, failed_stage, db, expected_stage=conv.stage,
+            inactive_before=utc_now() - _STAGE_RECOVERY_AFTER,
+        )
+        if changed:
+            conv.stage = failed_stage
+            logger.warning(f"已恢复中断的阶段任务: thread={thread_id}")
     resp: dict = {"thread_id": thread_id, "stage": conv.stage}
 
     # 包含所有阶段的历史确认结果，可以在前端统一展示
@@ -151,8 +206,8 @@ async def send_message(
 
     conv = await _get_conv(thread_id, user_id, db)
     history = await conversation_service.get_messages(thread_id, db)
-    await conversation_service.save_message(conv.id, "user", content, conv.stage, db)
-    logger.info(f"收到消息: thread={thread_id} stage={conv.stage} len={len(content)}")
+    message_stage = conv.stage
+    correction = message_stage == ConversationStage.S1_CONFIRMING
 
     if conv.stage == ConversationStage.S1_COLLECTING:
         def stream_fn(c, h, **kw):
@@ -179,54 +234,66 @@ async def send_message(
     else:
         raise HTTPException(status_code=400, detail=f"当前阶段 {conv.stage} 不支持发送消息")
 
+    if correction:
+        changed = await conversation_service.update_stage(
+            thread_id, ConversationStage.S1_COLLECTING, db,
+            expected_stage=ConversationStage.S1_CONFIRMING,
+        )
+        if not changed:
+            raise HTTPException(status_code=409, detail="会话阶段已变化，请刷新")
+        message_stage = ConversationStage.S1_COLLECTING
+    await conversation_service.save_message(conv.id, "user", content, message_stage, db)
+    logger.info(f"收到消息: thread={thread_id} stage={message_stage} len={len(content)}")
+
     async def generate():
         ai_content = []
-        case_ready_summary = None
-        s3_ready_facts = None
-
+        terminal_event = None
+        saved = False
         try:
+            if correction:
+                yield f"data: {json.dumps({'type': 'stage_changed', 'stage': message_stage})}\n\n"
             async for chunk in stream_fn(content, history, thread_id=thread_id):
-                yield chunk
                 if chunk.startswith("data: "):
-                    try:
-                        data = json.loads(chunk[6:])
-                        if data.get("type") == "token":
-                            ai_content.append(data.get("content", ""))
-                        elif data.get("type") == "case_ready":
-                            case_ready_summary = data.get("summary", "")
-                        elif data.get("type") == "s3_ready":
-                            s3_ready_facts = data.get("facts", "")
-                    except Exception:
-                        pass
-        finally:
-            # 无论是否中途断流，已收到的内容都存库
+                    data = json.loads(chunk[6:])
+                    if data.get("type") == "token":
+                        ai_content.append(data.get("content", ""))
+                    elif data.get("type") in {"case_ready", "s3_ready", "end", "done"}:
+                        terminal_event = data
+                        continue
+                yield chunk
+
+            # 确认卡片只能在对应摘要及阶段已成功持久化后发送。
             if ai_content:
-                full_content = "".join(ai_content).strip()
-                if full_content:
-                    await conversation_service.save_message(conv.id, "assistant", full_content, conv.stage)
-
-            # S1：AI 检测到信息足够，自动推进到 s1_confirming
-            if case_ready_summary:
-                logger.info(f"S1 case_ready 触发: thread={thread_id}")
-                await conversation_service.update_stage(thread_id, ConversationStage.S1_CONFIRMING)
-                await conversation_service.save_stage_confirmation(
+                await conversation_service.save_message(conv.id, "assistant", "".join(ai_content).strip(), message_stage)
+            saved = True
+            if terminal_event and terminal_event["type"] in {"case_ready", "s3_ready"}:
+                is_s1 = terminal_event["type"] == "case_ready"
+                key = "summary" if is_s1 else "facts"
+                value = terminal_event.get(key)
+                if not isinstance(value, str) or not value.strip():
+                    raise ValueError("阶段摘要无效")
+                changed = await conversation_service.save_stage_confirmation(
                     conv_id=conv.id,
-                    stage=StageType.S1_CONFIRM,
-                    input_data={},
-                    output_data={"summary": case_ready_summary},
+                    stage=StageType.S1_CONFIRM if is_s1 else StageType.S3_CONFIRM,
+                    input_data={}, output_data={key: value},
+                    next_stage=ConversationStage.S1_CONFIRMING if is_s1 else ConversationStage.S3_CONFIRMING,
+                    expected_stage=message_stage,
                 )
-                asyncio.create_task(_gen_and_save_title(thread_id, case_ready_summary))
-
-            # S3：AI 检测到情节收集完毕，自动推进到 s3_confirming，并保存 facts
-            if s3_ready_facts:
-                logger.info(f"S3 s3_ready 触发: thread={thread_id}")
-                await conversation_service.save_stage_confirmation(
-                    conv_id=conv.id,
-                    stage=StageType.S3_CONFIRM,
-                    input_data={},
-                    output_data={"facts": s3_ready_facts},
-                )
-                await conversation_service.update_stage(thread_id, ConversationStage.S3_CONFIRMING)
+                if not changed:
+                    raise ValueError("会话阶段已变化")
+                if is_s1:
+                    _start_background(_gen_and_save_title(thread_id, value))
+            event = terminal_event or {"type": "end"}
+            yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+        except Exception:
+            logger.error(f"对话生成或保存失败: thread={thread_id}")
+            yield f"data: {json.dumps({'type': 'error', 'message': '回复未完成，请刷新会话后重试'}, ensure_ascii=False)}\n\n"
+        finally:
+            # 中途断流也尽量保存部分回复，不推进确认阶段。
+            if not saved and ai_content:
+                _start_background(conversation_service.save_message(
+                    conv.id, "assistant", "".join(ai_content).strip(), message_stage,
+                ))
 
     return StreamingResponse(generate(), media_type="text/event-stream")
 
@@ -253,6 +320,8 @@ async def get_report(
     ):
     """返回S4阶段生成的风险评估报告"""
     conv = await _get_conv(thread_id, user_id, db)
+    if conv.stage != ConversationStage.S4_DONE:
+        raise HTTPException(status_code=404, detail="报告尚未生成")
     report = await _get_stage_confirmation(conv.id, StageType.S4_REPORT, db)
     if not report:
         logger.debug(f"报告尚未生成: thread={thread_id}")
@@ -271,26 +340,21 @@ async def advance_stage(
     conv = await _get_conv(thread_id, user_id, db)
 
     if conv.stage == ConversationStage.S3_COLLECTING:
-        # S3 手动兜底：信号未触发时用户可手动推进
-        s3_data = await _get_stage_confirmation(conv.id, StageType.S3_CONFIRM, db)
-        facts = s3_data.get("facts", "暂无汇总")
-        if not s3_data:
-            facts = "量刑情节已收集，请确认后继续。"
-            await conversation_service.save_stage_confirmation(
-                conv_id=conv.id,
-                stage=StageType.S3_CONFIRM,
-                input_data={},
-                output_data={"facts": facts},
-                db=db,
-            )
-        await conversation_service.update_stage(thread_id, ConversationStage.S3_CONFIRMING, db)
+        history = await conversation_service.get_messages(thread_id, db)
+        history = [m for m in history if m.get("stage") == ConversationStage.S3_COLLECTING]
+        if not any(m["role"] == "user" for m in history):
+            raise HTTPException(status_code=400, detail="请先补充量刑情节再确认")
+        facts = await summarize_facts(history, thread_id=thread_id)
+        changed = await conversation_service.save_stage_confirmation(
+            conv_id=conv.id, stage=StageType.S3_CONFIRM,
+            input_data={}, output_data={"facts": facts}, db=db,
+            next_stage=ConversationStage.S3_CONFIRMING,
+            expected_stage=ConversationStage.S3_COLLECTING,
+        )
+        if not changed:
+            raise HTTPException(status_code=409, detail="会话阶段已变化，请刷新")
         logger.info(f"S3 手动推进: thread={thread_id} -> s3_confirming")
-        return {
-            "thread_id": thread_id,
-            "stage": ConversationStage.S3_CONFIRMING,
-            "sufficient": True,
-            "summary": facts,
-        }
+        return {"thread_id": thread_id, "stage": ConversationStage.S3_CONFIRMING, "sufficient": True, "summary": facts}
 
     if conv.stage != ConversationStage.S1_COLLECTING:
         raise HTTPException(status_code=400, detail=f"当前阶段 {conv.stage} 不支持推进")
@@ -299,7 +363,7 @@ async def advance_stage(
     result = await check_sufficient(history, thread_id=thread_id)
     if not result.get("sufficient"):
         reason = result.get("reason", "信息不足，请继续补充案情")
-        logger.info(f"S1 advance 信息不足: thread={thread_id} reason={reason}")
+        logger.info(f"S1 advance 信息不足: thread={thread_id}")
         await conversation_service.save_message(conv.id, "assistant", reason, conv.stage, db)
         return {
             "thread_id": thread_id,
@@ -308,14 +372,17 @@ async def advance_stage(
             "reason": reason,
         }
     summary = result.get("summary", "")
-    await conversation_service.save_stage_confirmation(
+    changed = await conversation_service.save_stage_confirmation(
         conv_id=conv.id,
         stage=StageType.S1_CONFIRM,
         input_data={},
         output_data={"summary": summary},
         db=db,
+        next_stage=ConversationStage.S1_CONFIRMING,
+        expected_stage=ConversationStage.S1_COLLECTING,
     )
-    await conversation_service.update_stage(thread_id, ConversationStage.S1_CONFIRMING, db)
+    if not changed:
+        raise HTTPException(status_code=409, detail="会话阶段已变化，请刷新")
     logger.info(f"S1 手动推进: thread={thread_id} -> s1_confirming")
     return {
         "thread_id": thread_id,
@@ -335,22 +402,42 @@ async def confirm_stage(
     """卡点确认：accepted=true 推进阶段，false 回退重新收集"""
     conv = await _get_conv(thread_id, user_id, db)
 
-    if conv.stage == ConversationStage.S1_CONFIRMING:
+    previous_stage = conv.stage
+    summary = ""
+    if previous_stage in {ConversationStage.S1_CONFIRMING, ConversationStage.S2_FAILED}:
         next_stage = ConversationStage.S2_SEARCHING if body.accepted else ConversationStage.S1_COLLECTING
         if body.accepted:
             s1_data = await _get_stage_confirmation(conv.id, StageType.S1_CONFIRM, db)
             summary = s1_data.get("summary", "")
-            asyncio.create_task(_gen_and_save_title(thread_id, summary))
-            asyncio.create_task(_run_s2_and_save(thread_id, conv.id, summary))
-    elif conv.stage == ConversationStage.S3_CONFIRMING:
+            if not isinstance(summary, str) or not summary.strip():
+                raise HTTPException(status_code=400, detail="缺少案情摘要，请先补充案情")
+    elif previous_stage in {ConversationStage.S3_CONFIRMING, ConversationStage.S4_FAILED}:
         next_stage = ConversationStage.S4_GENERATING if body.accepted else ConversationStage.S3_COLLECTING
         if body.accepted:
-            asyncio.create_task(_run_s4_and_save(thread_id, conv.id))
+            s3_data = await _get_stage_confirmation(conv.id, StageType.S3_CONFIRM, db)
+            facts = s3_data.get("facts")
+            if not isinstance(facts, str) or not facts.strip():
+                raise HTTPException(status_code=400, detail="缺少量刑情节，请先补充")
     else:
-        raise HTTPException(status_code=400, detail=f"当前阶段 {conv.stage} 无需确认")
+        raise HTTPException(status_code=400, detail=f"当前阶段 {previous_stage} 无需确认")
 
-    await conversation_service.update_stage(thread_id, next_stage, db)
-    logger.info(f"阶段确认: thread={thread_id} accepted={body.accepted} {conv.stage} -> {next_stage}")
+    changed = await conversation_service.update_stage(thread_id, next_stage, db, expected_stage=previous_stage)
+    if not changed:
+        raise HTTPException(status_code=409, detail="会话阶段已变化，请刷新")
+    # 先提交阶段，再启动任务；重复确认不能启动第二份后台任务。
+    if body.accepted:
+        if next_stage == ConversationStage.S2_SEARCHING:
+            _start_background(_gen_and_save_title(thread_id, summary))
+            _start_background(_run_stage_task(
+                thread_id, _run_s2_and_save(thread_id, conv.id, summary),
+                ConversationStage.S2_SEARCHING, ConversationStage.S2_FAILED,
+            ))
+        else:
+            _start_background(_run_stage_task(
+                thread_id, _run_s4_and_save(thread_id, conv.id),
+                ConversationStage.S4_GENERATING, ConversationStage.S4_FAILED,
+            ))
+    logger.info(f"阶段确认: thread={thread_id} accepted={body.accepted} {previous_stage} -> {next_stage}")
     return {"thread_id": thread_id, "stage": next_stage}
 
 
@@ -360,8 +447,8 @@ async def _gen_and_save_title(thread_id: str, summary: str) -> None:
         title = await generate_title(summary)
         await conversation_service.update_title(thread_id, title)
         logger.info(f"会话标题已生成: thread={thread_id}")
-    except Exception as e:
-        logger.warning(f"标题生成失败: {e}")
+    except Exception:
+        logger.warning(f"标题生成失败: thread={thread_id}")
 
 
 async def _run_s2_and_save(thread_id: str, conv_id: int, summary: str) -> None:
@@ -379,30 +466,52 @@ async def _run_s2_and_save(thread_id: str, conv_id: int, summary: str) -> None:
 
         # 2. 生成量刑要素清单
         checklist = await gen_checklist(summary, search_result, thread_id=thread_id)
-        await conversation_service.save_stage_confirmation(
+        changed = await conversation_service.save_stage_confirmation(
             conv_id=conv_id,
             stage=StageType.S2_CHECKLIST,
             input_data={"summary": summary},
             output_data=checklist,
+            next_stage=ConversationStage.S3_COLLECTING,
+            expected_stage=ConversationStage.S2_SEARCHING,
         )
+        if not changed:
+            return
         logger.info(f"S2清单生成完成: {thread_id}")
-    except Exception as e:
-        logger.error(f"S2任务失败: {e}")
+    except Exception:
+        logger.error(f"S2任务失败: thread={thread_id}")
         # 写入失败状态，前端轮询时可感知
-        await conversation_service.update_stage(thread_id, ConversationStage.S2_FAILED)
+        await conversation_service.update_stage(thread_id, ConversationStage.S2_FAILED, expected_stage=ConversationStage.S2_SEARCHING)
         return
 
     # 3. S2核心产物完成后立即推进到 s3_collecting，避免被 opener 生成耗时阻塞
-    await conversation_service.update_stage(thread_id, ConversationStage.S3_COLLECTING)
     logger.info(f"已推进到s3_collecting: {thread_id}")
 
     # 4. 异步生成 S3 开场白（失败不回退阶段）
+    from app.agent.service.s3 import gen_s3_opener
+    from app.db.database import async_session
+
     try:
-        from app.agent.service.s3 import gen_s3_opener
         welcome_msg = await gen_s3_opener(checklist, thread_id)
-        await conversation_service.save_message(conv_id, "assistant", welcome_msg, ConversationStage.S3_COLLECTING)
-    except Exception as e:
-        logger.warning(f"S3开场白生成失败: {e}")
+        if not welcome_msg.strip():
+            raise ValueError("开场语为空")
+    except Exception:
+        logger.warning(f"S3开场白生成失败，使用默认提示: thread={thread_id}")
+        welcome_msg = "检索已完成。请补充量刑相关事实，例如是否自首、是否退赔；不确定的内容可以说明不清楚。"
+    try:
+        async with async_session() as db:
+            result = await db.execute(select(Conversation).where(Conversation.id == conv_id).with_for_update())
+            conv = result.scalar_one_or_none()
+            if conv is None or conv.stage != ConversationStage.S3_COLLECTING:
+                return
+            user_message = await db.execute(select(Message.id).where(
+                Message.conversation_id == conv_id,
+                Message.stage == ConversationStage.S3_COLLECTING,
+                Message.role == MessageRole.USER,
+            ).limit(1))
+            if user_message.scalar_one_or_none() is None:
+                await conversation_service.save_message(conv_id, "assistant", welcome_msg, ConversationStage.S3_COLLECTING, db)
+    except Exception:
+        logger.warning(f"S3开场白生成失败: thread={thread_id}")
 
 
 async def _run_s4_and_save(thread_id: str, conv_id: int) -> None:
@@ -430,14 +539,16 @@ async def _run_s4_and_save(thread_id: str, conv_id: int) -> None:
         s3_facts = s3_data.get("facts", "")
 
         report = await gen_report(summary, s2_data, checklist, s3_facts, thread_id=thread_id)
-        await conversation_service.save_stage_confirmation(
+        changed = await conversation_service.save_stage_confirmation(
             conv_id=conv_id,
             stage=StageType.S4_REPORT,
             input_data={"summary": summary},
             output_data=report,
+            next_stage=ConversationStage.S4_DONE,
+            expected_stage=ConversationStage.S4_GENERATING,
         )
-        await conversation_service.update_stage(thread_id, ConversationStage.S4_DONE)
-        logger.info(f"S4报告生成完成: {thread_id}")
-    except Exception as e:
-        logger.error(f"S4任务失败: {e}")
-        await conversation_service.update_stage(thread_id, ConversationStage.S4_FAILED)
+        if changed:
+            logger.info(f"S4报告生成完成: {thread_id}")
+    except Exception:
+        logger.error(f"S4任务失败: thread={thread_id}")
+        await conversation_service.update_stage(thread_id, ConversationStage.S4_FAILED, expected_stage=ConversationStage.S4_GENERATING)

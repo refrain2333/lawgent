@@ -1,6 +1,7 @@
 # 数据浏览服务层
 import json
-from pathlib import Path
+
+from fastapi import HTTPException
 
 from app.db.data_loader import get_data_loader
 from app.schemas.v1.data import ArticleItem, ArticleListResponse, CaseItem, CaseListResponse
@@ -12,7 +13,9 @@ def _load_cases_json() -> list:
     global _cases_cache
     if _cases_cache is not None:
         return _cases_cache
-    p = Path(__file__).resolve().parent.parent.parent.parent / "data" / "cases" / "legal_cases.json"
+    p = get_data_loader().cases_json_path
+    if not p.is_file():
+        raise HTTPException(status_code=503, detail="案例原始 JSON 数据未加载")
     items = []
     with open(p, encoding="utf-8") as f:
         for i, line in enumerate(f):
@@ -30,7 +33,7 @@ def _load_cases_json() -> list:
                     "relevant_articles": [str(a) for a in (meta.get("relevant_articles", []) or [])],
                     "criminals": meta.get("criminals", []),
                     "imprisonment_months": toi.get("imprisonment"),
-                    "fine_amount": meta.get("punish_of_money") or None,
+                    "fine_amount": meta.get("punish_of_money"),
                     "death_penalty": bool(toi.get("death_penalty", False)),
                     "life_imprisonment": bool(toi.get("life_imprisonment", False)),
                 })
@@ -40,7 +43,7 @@ def _load_cases_json() -> list:
     return _cases_cache
 
 
-def list_articles(q: str, chapter: str, page: int, page_size: int) -> ArticleListResponse:
+def list_articles(q: str, chapter: str, page: int, page_size: int, article_number: str = "") -> ArticleListResponse:
     loader = get_data_loader()
     raw_list = loader.original_data.get("articles") or loader.get_metadata("articles") or []
 
@@ -57,6 +60,8 @@ def list_articles(q: str, chapter: str, page: int, page_size: int) -> ArticleLis
             chap = str(getattr(meta, "chapter", "") or "")
             content = str(getattr(meta, "content", "") or "")
         if art_num is None:
+            continue
+        if article_number and str(art_num) != article_number:
             continue
         if q and q not in title and q not in chap and q not in content and q not in str(art_num):
             continue
@@ -87,8 +92,8 @@ def list_cases(q: str, page: int, page_size: int) -> CaseListResponse:
             fact=fact,
             relevant_articles=meta.get("relevant_articles", []),
             criminals=[str(c) for c in meta.get("criminals", []) if c],
-            imprisonment_months=int(meta["imprisonment_months"]) if meta.get("imprisonment_months") else None,
-            fine_amount=float(meta["fine_amount"]) if meta.get("fine_amount") else None,
+            imprisonment_months=int(meta["imprisonment_months"]) if meta.get("imprisonment_months") is not None else None,
+            fine_amount=float(meta["fine_amount"]) if meta.get("fine_amount") is not None else None,
             death_penalty=meta.get("death_penalty", False),
             life_imprisonment=meta.get("life_imprisonment", False),
             ))

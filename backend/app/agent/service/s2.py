@@ -4,9 +4,10 @@ from pathlib import Path
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from app.agent.service.utils import load_prompt, parse_json
+from app.agent.service.utils import format_sentence, load_prompt, parse_json
 from app.core.logger import log_ai_call
 from app.infrastructure.llm_client import get_chat_model
+from app.schemas.v1.agent import SentencingChecklist
 from app.services.search_service import search_async
 
 logger = logging.getLogger(__name__)
@@ -35,7 +36,11 @@ async def _gen_queries(summary: str, thread_id: str = "") -> dict:
     result = parse_json(raw)
     if not result:
         logger.warning("S2 检索词解析失败，使用案情摘要回退")
-    return result
+    return {
+        key: value.strip() if isinstance(value, str) else ""
+        for key in ("vector", "bm25", "kg", "query2doc", "hyde")
+        for value in [result.get(key)]
+    }
 
 
 async def gen_checklist(summary: str, search_result: dict, thread_id: str = "") -> dict:
@@ -48,7 +53,7 @@ async def gen_checklist(summary: str, search_result: dict, thread_id: str = "") 
     ) or "暂无"
 
     cases_text = "\n".join(
-        f"- 罪名：{'、'.join(c.get('accusations', []))}，判决：{c.get('sentence_months', '未知')}个月"
+        f"- 罪名：{'、'.join(c.get('accusations', []))}，判决：{format_sentence(c)}"
         for c in fused.get("cases", [])[:5]
     ) or "暂无"
 
@@ -61,9 +66,7 @@ async def gen_checklist(summary: str, search_result: dict, thread_id: str = "") 
     raw = response.content.strip()
     log_ai_call(stage="s2_checklist", thread_id=thread_id, input_messages=messages, output=raw)
     result = parse_json(raw)
-    if not result:
-        logger.warning("清单输出不是有效 JSON 对象")
-    return result
+    return SentencingChecklist.model_validate(result).model_dump()
 
 
 async def run_s2(summary: str, thread_id: str = "", count: int = 5) -> dict:
@@ -72,7 +75,7 @@ async def run_s2(summary: str, thread_id: str = "", count: int = 5) -> dict:
     logger.info(f"S2 检索词生成完成: thread={thread_id}")
 
     result = await search_async(
-        vector=queries.get("vector", summary),
+        vector=queries.get("vector") or summary,
         bm25=queries.get("bm25", ""),
         kg=queries.get("kg", ""),
         query2doc=queries.get("query2doc", ""),

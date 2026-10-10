@@ -49,7 +49,7 @@ LawGent/
 
 ## 环境要求
 
-- Python `>= 3.9`
+- Python `>= 3.11`（模型枚举使用 Python 3.11 的 `StrEnum`）
 - Node.js 22.x、npm 10.x
 - `uv`（Python 依赖管理）
 - Docker / Docker Compose（本地 PostgreSQL）
@@ -78,6 +78,8 @@ uv run python main.py
 
 - API: `http://127.0.0.1:5006`
 - Docs: `http://127.0.0.1:5006/docs`
+
+升级已有数据库前应备份。历史迁移 `f4a2b3c1d5e6` 曾包含清空用户和咨询数据的逻辑，现已移除；已经执行旧版迁移而被删除的数据只能从原备份恢复。旧报告会转存到阶段记录；标识迁移会保留旧标题，为空标题或重复标题生成独立会话标识。
 
 ### 3. 启动前端
 
@@ -122,7 +124,13 @@ npm run dev
 `DATABASE_URL`、`DATA_VECTORS_PATH`、`DATA_CRIMINAL_PATH`、`DATA_KG_PATH`、
 `LOCAL_MODEL_PATH`、`FINETUNED_MODEL_PATH`、`MODEL_OFFLINE_MODE`、`HF_HOME`、`LLM_API_KEY`。
 
+公开部署时设置 `DEBUG=False`，使用随机 `JWT_SECRET`，并将 `CORS_ORIGINS` 改为实际前端地址。`.env.example` 的调试配置和示例密钥仅供本地开发。
+
 AI 输入和回复正文默认不写入日志。只有在受控调试时才将 `LOG_AI_CONTENT=True`；开启后，日志可能包含个人案件信息，应限制访问并及时清理。
+
+访问日志中的认证参数与检索正文会脱敏；第三方 HTTP/LLM 客户端不会输出调试请求正文，异常诊断也不展示局部变量。
+
+S2 检索与 S4 报告任务的运行时限为 15 分钟，超时后可在界面重试。异常停机留下的处理中会话，在 30 分钟无更新后，查询状态时会转为失败并允许重试；当前不提供跨进程断点续算。
 
 > 请勿把填好真实密钥的 `.env` 提交到仓库。
 

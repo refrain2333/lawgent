@@ -13,9 +13,10 @@ def list_articles(
     chapter: str = Query(default="", description="章节筛选"),
     page: int = Query(default=1, ge=1, description="页码"),
     page_size: int = Query(default=20, ge=1, le=100, description="每页数量"),
+    article_number: str = Query(default="", pattern=r"^\d*$", description="精确法条编号，使用裸数字，如264"),
     ):
     """返回法条分页列表，支持关键词搜索和章节筛选。"""
-    return data_service.list_articles(q, chapter, page, page_size)
+    return data_service.list_articles(q, chapter, page, page_size, article_number)
 
 
 @router.get("/data/cases", response_model=CaseListResponse, summary="案例列表")

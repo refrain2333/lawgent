@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { apiUrl } from '@/lib/api'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import ArticleCard from '@/components/legal/ArticleCard.vue'
 import CaseCard from '@/components/legal/CaseCard.vue'
@@ -21,9 +22,13 @@ const articlePageSize = 20
 const articleTotal = ref(0)
 const articleItems = ref<any[]>([])
 const articleLoading = ref(false)
+const articleError = ref('')
+let articleRequest = 0
 
 async function fetchArticles() {
+  const requestId = ++articleRequest
   articleLoading.value = true
+  articleError.value = ''
   try {
     const params = new URLSearchParams({
       q: articleQuery.value,
@@ -31,14 +36,20 @@ async function fetchArticles() {
       page: String(articlePage.value),
       page_size: String(articlePageSize),
     })
-    const res = await fetch(`/api/v1/data/articles?${params}`)
+    const res = await fetch(apiUrl(`/data/articles?${params}`))
     const data = await res.json()
+    if (requestId !== articleRequest) return
+    if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : `请求失败（${res.status}）`)
     articleItems.value = data.items || []
     articleTotal.value = data.total || 0
   } catch (e) {
-    articleItems.value = []
+    if (requestId === articleRequest) {
+      articleItems.value = []
+      articleTotal.value = 0
+      articleError.value = e instanceof Error ? e.message : '加载失败'
+    }
   } finally {
-    articleLoading.value = false
+    if (requestId === articleRequest) articleLoading.value = false
   }
 }
 
@@ -56,23 +67,33 @@ const casePageSize = 20
 const caseTotal = ref(0)
 const caseItems = ref<any[]>([])
 const caseLoading = ref(false)
+const caseError = ref('')
+let caseRequest = 0
 
 async function fetchCases() {
+  const requestId = ++caseRequest
   caseLoading.value = true
+  caseError.value = ''
   try {
     const params = new URLSearchParams({
       q: caseQuery.value,
       page: String(casePage.value),
       page_size: String(casePageSize),
     })
-    const res = await fetch(`/api/v1/data/cases?${params}`)
+    const res = await fetch(apiUrl(`/data/cases?${params}`))
     const data = await res.json()
+    if (requestId !== caseRequest) return
+    if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : `请求失败（${res.status}）`)
     caseItems.value = data.items || []
     caseTotal.value = data.total || 0
   } catch (e) {
-    caseItems.value = []
+    if (requestId === caseRequest) {
+      caseItems.value = []
+      caseTotal.value = 0
+      caseError.value = e instanceof Error ? e.message : '加载失败'
+    }
   } finally {
-    caseLoading.value = false
+    if (requestId === caseRequest) caseLoading.value = false
   }
 }
 
@@ -88,7 +109,7 @@ const graphArticleIds = ref<Set<number>>(new Set())
 
 async function fetchGraphArticleIds() {
   try {
-    const res = await fetch('/api/v1/graph/article_ids')
+    const res = await fetch(apiUrl('/graph/article_ids'))
     const data = await res.json()
     graphArticleIds.value = new Set(data.ids || [])
   } catch (e) {}
@@ -100,10 +121,15 @@ onMounted(() => {
   fetchCases()
   fetchGraphArticleIds()
 })
+onUnmounted(() => { articleRequest++; caseRequest++ })
 
 watch(activeTab, (tab) => {
   if (tab === 'articles' && articleItems.value.length === 0) fetchArticles()
   if (tab === 'cases' && caseItems.value.length === 0) fetchCases()
+})
+
+watch(() => route.query.tab, tab => {
+  activeTab.value = tab === 'cases' ? 'cases' : 'articles'
 })
 </script>
 
@@ -145,6 +171,7 @@ watch(activeTab, (tab) => {
         </div>
 
         <div v-if="articleLoading" class="text-center py-12 text-muted-foreground text-sm">加载中...</div>
+        <div v-else-if="articleError" role="alert" class="text-center py-12 text-destructive text-sm">{{ articleError }}</div>
 
         <div v-else>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -175,6 +202,7 @@ watch(activeTab, (tab) => {
         </div>
 
         <div v-if="caseLoading" class="text-center py-12 text-muted-foreground text-sm">加载中...</div>
+        <div v-else-if="caseError" role="alert" class="text-center py-12 text-destructive text-sm">{{ caseError }}</div>
 
         <div v-else>
           <div class="space-y-3">

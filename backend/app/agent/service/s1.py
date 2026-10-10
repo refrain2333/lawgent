@@ -74,7 +74,7 @@ async def chat_s1(
     if accumulated.tool_calls:
         tool_call = accumulated.tool_calls[0]
         summary = tool_call.get("args", {}).get("summary", "")
-        if summary:
+        if tool_call.get("name") == "case_ready_tool" and isinstance(summary, str) and summary.strip():
             yield f"data: {json.dumps({'type': 'case_ready', 'summary': summary}, ensure_ascii=False)}\n\n"
             return
 
@@ -83,8 +83,21 @@ async def chat_s1(
 
 async def chat_s1_confirming(user_message: str, history: list[dict], thread_id: str = "") -> AsyncGenerator[str, None]:
     """案情确认：处理用户纠正或补充"""
+    response_chunks = []
     async for chunk in llm_stream(_PROMPT_CONFIRMING, history, user_message, stage="s1_confirming", thread_id=thread_id):
-        yield chunk
+        data = json.loads(chunk[6:])
+        if data.get("type") == "token":
+            response_chunks.append(data["content"])
+            yield chunk
+    updated_history = history + [
+        {"role": "user", "content": user_message},
+        {"role": "assistant", "content": "".join(response_chunks)},
+    ]
+    result = await check_sufficient(updated_history, thread_id=thread_id)
+    if result["sufficient"]:
+        yield f"data: {json.dumps({'type': 'case_ready', 'summary': result['summary']}, ensure_ascii=False)}\n\n"
+    else:
+        yield f"data: {json.dumps({'type': 'end'}, ensure_ascii=False)}\n\n"
 
 
 async def check_sufficient(history: list[dict], thread_id: str = "") -> dict:
@@ -103,7 +116,10 @@ async def check_sufficient(history: list[dict], thread_id: str = "") -> dict:
     result = parse_json(raw)
     if isinstance(result.get("sufficient"), bool):
         summary = result.get("summary")
-        if not result["sufficient"] or (isinstance(summary, str) and summary.strip()):
+        if not result["sufficient"]:
+            reason = result.get("reason")
+            return {"sufficient": False, "reason": reason if isinstance(reason, str) and reason.strip() else "信息不足，请继续补充案情", "summary": ""}
+        if isinstance(summary, str) and summary.strip():
             return result
     return {"sufficient": False, "reason": "判断失败，请继续补充案情", "summary": ""}
 

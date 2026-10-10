@@ -16,3 +16,4 @@ npm run dev
 ## 注意事项
 - 必须使用 `npm ci` 而非 `npm install`
 - 项目使用 package-lock.json 锁定依赖版本
+- 默认请求同源 `/api/v1`。如前后端分开部署，构建时设置 `VITE_API_BASE_URL=https://你的后端域名`（不含 `/api/v1`）；后端需允许前端域名的 CORS 请求。开发模式使用该地址作为 Vite 代理目标。

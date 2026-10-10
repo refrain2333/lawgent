@@ -6,7 +6,7 @@ from langchain_core.messages import AIMessage, AIMessageChunk, HumanMessage, Sys
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
-from app.agent.service.utils import load_prompt
+from app.agent.service.utils import format_sentence, load_prompt
 from app.core.logger import log_ai_call
 from app.infrastructure.llm_client import get_chat_model
 
@@ -46,9 +46,7 @@ def _build_search_context(s2_data: dict) -> str:
         lines.append("### 类似案例量刑参考")
         for c in cases[:3]:
             acc = "、".join(c.get("accusations", []))
-            months = c.get("sentence_months")
-            sentence = f"{months}个月" if months else "未知"
-            lines.append(f"- 罪名：{acc}，判决：有期徒刑{sentence}")
+            lines.append(f"- 罪名：{acc}，判决：{format_sentence(c)}")
 
     kg = s2_data.get("paths", {}).get("kg", {})
     kg_articles = kg.get("articles", [])
@@ -159,8 +157,22 @@ async def chat_s3(
     if accumulated.tool_calls:
         tool_call = accumulated.tool_calls[0]
         facts = tool_call.get("args", {}).get("facts", "")
-        if facts:
+        if tool_call.get("name") == "s3_ready_tool" and isinstance(facts, str) and facts.strip():
             yield f"data: {json.dumps({'type': 's3_ready', 'facts': facts}, ensure_ascii=False)}\n\n"
             return
 
     yield f"data: {json.dumps({'type': 'end'}, ensure_ascii=False)}\n\n"
+
+
+async def summarize_facts(history: list[dict], thread_id: str = "") -> str:
+    """手动推进也必须使用实际对话汇总，不能把占位文字当量刑情节。"""
+    messages = [SystemMessage(content="请汇总以下对话中用户实际提供的量刑情节，逐项列出。未知信息写不明，不能根据助手的问题推断用户回答。只输出情节汇总。")]
+    for message in history:
+        cls = HumanMessage if message["role"] == "user" else AIMessage
+        messages.append(cls(content=message["content"]))
+    response = await get_chat_model().ainvoke(messages)
+    facts = response.content.strip()
+    if not facts:
+        raise ValueError("量刑情节汇总为空")
+    log_ai_call(stage="s3_summarize", thread_id=thread_id, input_messages=messages, output=facts)
+    return facts

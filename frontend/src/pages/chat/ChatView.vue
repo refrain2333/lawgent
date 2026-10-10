@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { defineAsyncComponent, ref, onMounted, onUnmounted, nextTick, watch, computed } from 'vue'
-import { useChatStore } from '@/stores/chat'
-import { Send, Bot, User, Loader2, Check, X, FileText, Plus, Clock, ChevronRight, Trash2, RefreshCw, Search, Zap, AlertTriangle, Scale, BookOpen, Gavel, BadgeCheck, BarChart2 } from 'lucide-vue-next'
+import { useChatStore, STAGE_MAP, type Stage } from '@/stores/chat'
+import { useAuthStore } from '@/stores/auth'
+import { useRouter } from 'vue-router'
+import { Send, Bot, User, Loader2, Check, X, FileText, Plus, Clock, ChevronRight, Trash2, RefreshCw, Search, Zap, AlertTriangle, Scale, BookOpen, Gavel, BadgeCheck } from 'lucide-vue-next'
 import NavBar from '@/components/ui/NavBar.vue'
 import MarkdownViewer from '@/components/ui/MarkdownViewer.vue'
 
@@ -10,13 +12,16 @@ const Input = defineAsyncComponent(() => import('@/components/ui/Input.vue') as 
 const Card = defineAsyncComponent(() => import('@/components/ui/Card.vue') as any)
 
 const chatStore = useChatStore()
+const authStore = useAuthStore()
+const router = useRouter()
 
 const inputMessage = ref('')
 const messagesContainer = ref<HTMLElement | null>(null)
-const inputRef = ref<HTMLInputElement | null>(null)
+const inputRef = ref<{ focus: () => void } | null>(null)
 const deletingId = ref<string | null>(null)
 const pendingDeleteId = ref<string | null>(null)
 const isEnteringS3 = ref(false)
+let enteringS3Version = 0
 
 async function deleteConversation(threadId: string) {
   pendingDeleteId.value = threadId
@@ -35,9 +40,12 @@ async function sendMessage() {
   const canChatNow = isS1Collecting || isS3Collecting || isS4Done
 
   if (!inputMessage.value.trim() || chatStore.isThinking || !canChatNow) return
-  if (!chatStore.isConnected) await chatStore.connect()
-  chatStore.send(inputMessage.value)
+  if (!chatStore.isConnected && !await chatStore.connect()) return
+  const text = inputMessage.value
+  const threadId = chatStore.conversationId
   inputMessage.value = ''
+  const accepted = await chatStore.send(text)
+  if (!accepted && chatStore.conversationId === threadId && !inputMessage.value) inputMessage.value = text
   await nextTick()
   inputRef.value?.focus()
 }
@@ -53,11 +61,14 @@ function handleAdvance() {
 async function goToS3() {
   const threadId = chatStore.conversationId
   if (!threadId || isEnteringS3.value) return
+  const version = ++enteringS3Version
+  const isCurrentEntry = () => version === enteringS3Version && chatStore.conversationId === threadId
 
   isEnteringS3.value = true
   try {
     chatStore.viewStage = 'S3'
     await chatStore.fetchMessages(threadId)
+    if (!isCurrentEntry()) return
 
     const hasS3AssistantMsg = () =>
       chatStore.messages.some(m => m.role === 'assistant' && m.stage === 's3_collecting')
@@ -66,17 +77,19 @@ async function goToS3() {
 
     for (let i = 0; i < 8; i++) {
       const state = await chatStore.syncState(threadId)
+      if (!isCurrentEntry()) return
       if (state?.s3_opener_ready) {
         await chatStore.fetchMessages(threadId)
         return
       }
       await new Promise(r => setTimeout(r, 1200))
+      if (!isCurrentEntry()) return
     }
 
     // 兜底：即便 opener 仍未到，也至少同步一次最新消息
-    await chatStore.fetchMessages(threadId)
+    if (isCurrentEntry()) await chatStore.fetchMessages(threadId)
   } finally {
-    isEnteringS3.value = false
+    if (version === enteringS3Version) isEnteringS3.value = false
   }
 }
 
@@ -93,7 +106,7 @@ const defaultWidth = parseInt(localStorage.getItem('sidebarWidth') || '288')
 const sidebarWidth = ref(defaultWidth)
 const isDragging = ref(false)
 
-function startDrag(e: MouseEvent) {
+function startDrag() {
   isDragging.value = true
   document.body.style.cursor = 'col-resize'
   document.body.style.userSelect = 'none'
@@ -155,7 +168,7 @@ async function startNewChat() {
   try {
     chatStore.disconnect()
     chatStore.reset()
-    await chatStore.connect()
+    if (!await chatStore.connect()) return
     await chatStore.fetchConversations()
     localStorage.setItem('lastNewChatTime', Date.now().toString())
     updateCooldown()
@@ -168,8 +181,7 @@ async function startNewChat() {
 async function openConversation(threadId: string) {
   chatStore.disconnect()
   chatStore.reset()
-  await chatStore.connect(threadId)
-  await chatStore.fetchMessages(threadId)
+  if (await chatStore.connect(threadId)) await chatStore.fetchMessages(threadId)
 }
 
 function stageLabel(stage: string) {
@@ -229,7 +241,7 @@ const filteredConversations = computed(() => {
 
 // 是否显示"完成收集"按钮（S1 手动兜底 / S3 信号失效兜底）
 const canAdvance = computed(() => {
-  const userMsgCount = chatStore.messages.filter(m => m.role === 'user').length
+  const userMsgCount = chatStore.messages.filter(m => m.role === 'user' && STAGE_MAP[m.stage ?? ''] === chatStore.viewStage).length
 
   // 仅在符合以下所有条件时显示常驻按钮:
   // 1. 当前数据库真实阶段是在收集阶段 (s1_collecting 或 s3_collecting)
@@ -240,6 +252,7 @@ const canAdvance = computed(() => {
     && chatStore.viewStage === (chatStore.dbStage === 's1_collecting' ? 'S1' : 'S3')
     && userMsgCount >= 5
     && !chatStore.isThinking
+    && !chatStore.isLoading
 })
 
 // 输入框是否禁用
@@ -251,6 +264,9 @@ const inputDisabled = computed(() => {
 
   return (
     chatStore.conversationId == null
+    || chatStore.isLoading
+    || chatStore.isConfirming
+    || isEnteringS3.value
     || chatStore.isThinking
     || !canChatNow
     || !!chatStore.confirmRequest
@@ -285,8 +301,17 @@ watch(() => chatStore.messages, async () => {
 }, { deep: true })
 
 watch(() => chatStore.conversationId, () => {
+  enteringS3Version++
+  isEnteringS3.value = false
+  inputMessage.value = ''
+  showReport.value = false
+  showAdvanceConfirm.value = false
   pendingAutoOpenReportThreadId.value = null
   s4WasWaiting.value = false
+})
+
+watch(() => authStore.token, token => {
+  if (!token) router.replace({ name: 'login' })
 })
 
 watch(() => chatStore.isS4Waiting, (waiting) => {
@@ -310,11 +335,14 @@ watch(() => chatStore.isS4Waiting, (waiting) => {
 onMounted(async () => {
   updateCooldown()
   if (newChatCooldown.value > 0) startCooldownTimer()
-  await chatStore.fetchConversations()
+  await Promise.all([chatStore.fetchConversations(), chatStore.conversationId ? chatStore.refreshState() : Promise.resolve()])
 })
 
 onUnmounted(() => {
+  enteringS3Version++
   chatStore.disconnect()
+  if (cooldownTimer) window.clearInterval(cooldownTimer)
+  if (isDragging.value) stopDrag()
 })
 
 // 当前在 viewStage 下应该展示的消息
@@ -322,17 +350,12 @@ const currentStageMessages = computed(() => {
   return chatStore.messages.filter(m => {
     if (m.streaming) return true  // 正在流式输出的消息始终显示
     if (!m.stage) return true
-    const mapped = {
-      s1_collecting: 'S1', s1_confirming: 'S1',
-      s2_searching: 'S2', s2_failed: 'S2',
-      s3_collecting: 'S3', s3_confirming: 'S3',
-      s4_generating: 'S4', s4_done: 'S4', s4_failed: 'S4',
-    }[m.stage]
+    const mapped = STAGE_MAP[m.stage]
     return mapped === chatStore.viewStage
   })
 })
 
-const stages = [
+const stages: { id: Stage; label: string }[] = [
   { id: 'S1', label: '案情询问' },
   { id: 'S2', label: '检索分析' },
   { id: 'S3', label: '情节收集' },
@@ -350,6 +373,19 @@ const steps = [
 <template>
   <div class="h-screen flex flex-col bg-background">
     <NavBar />
+
+    <div class="md:hidden flex gap-2 p-2 border-b border-border/60">
+      <Button size="sm" :disabled="isStartingNewChat || newChatCooldown > 0" @click="startNewChat">
+        {{ isStartingNewChat ? '创建中...' : newChatCooldown > 0 ? `等待 ${newChatCooldown}s` : '新咨询' }}
+      </Button>
+      <select :value="chatStore.conversationId ?? ''" aria-label="历史咨询" class="min-w-0 flex-1 rounded-md border border-input bg-background px-2 text-sm"
+              @change="openConversation(($event.target as HTMLSelectElement).value)">
+        <option disabled value="">选择历史咨询</option>
+        <option v-for="conv in chatStore.conversations" :key="conv.thread_id" :value="conv.thread_id">
+          {{ conv.title || formatAsTitle(conv.created_at) }}
+        </option>
+      </select>
+    </div>
 
     <main class="flex-1 overflow-hidden flex flex-row">
 
@@ -542,6 +578,18 @@ const steps = [
 
         <div ref="messagesContainer" class="flex-1 overflow-y-auto p-4 space-y-6">
 
+          <div v-if="chatStore.requestError" role="alert" class="max-w-3xl mx-auto rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+            {{ chatStore.requestError }}
+          </div>
+          <div v-if="chatStore.dbStage === 's2_failed' || chatStore.dbStage === 's4_failed'" class="max-w-3xl mx-auto flex justify-end">
+            <Button :disabled="chatStore.isConfirming" @click="chatStore.retry()">
+              {{ chatStore.isConfirming ? '提交中...' : chatStore.dbStage === 's2_failed' ? '重新检索' : '重新生成报告' }}
+            </Button>
+          </div>
+          <div v-else-if="(chatStore.dbStage === 's4_generating' && !chatStore.isS4Waiting) || (chatStore.dbStage === 's2_searching' && !chatStore.isS2Waiting)" class="max-w-3xl mx-auto flex justify-end">
+            <Button variant="outline" @click="chatStore.refreshState()">刷新处理状态</Button>
+          </div>
+
           <!-- 加载中骨架屏 -->
           <div v-if="chatStore.isLoading" class="space-y-5 max-w-3xl mx-auto w-full">
             <div v-for="i in 6" :key="i" class="flex gap-3" :class="i % 3 === 0 ? 'flex-row-reverse' : ''">
@@ -716,7 +764,7 @@ const steps = [
               <Loader2 class="w-4 h-4 animate-spin text-primary shrink-0" />
               <div>
                 <p class="font-medium text-foreground">正在生成法律风险评估报告...</p>
-                <p class="text-xs mt-0.5">AI 正在综合分析，预计需要 10-30 秒</p>
+                <p class="text-xs mt-0.5">AI 正在综合分析，请稍候</p>
               </div>
             </div>
           </div>
@@ -733,10 +781,10 @@ const steps = [
               {{ chatStore.confirmRequest.summary }}
             </div>
             <div class="flex gap-2 justify-end pt-1">
-              <Button variant="outline" size="sm" @click="handleConfirm(false)">
+              <Button variant="outline" size="sm" :disabled="chatStore.isConfirming || chatStore.isThinking || chatStore.isLoading" @click="handleConfirm(false)">
                 <X class="w-3.5 h-3.5 mr-1" /> 需要补充
               </Button>
-              <Button size="sm" @click="handleConfirm(true)">
+              <Button size="sm" :disabled="chatStore.isConfirming || chatStore.isThinking || chatStore.isLoading" @click="handleConfirm(true)">
                 <Check class="w-3.5 h-3.5 mr-1" /> 确认无误
               </Button>
             </div>
@@ -846,11 +894,13 @@ const steps = [
                         </div>
                         <!-- 量刑标签 -->
                         <div class="flex flex-wrap gap-1.5 mb-2">
-                          <span v-if="c.sentence_months"
+                          <span v-if="c.death_penalty" class="text-[10px] font-medium text-destructive">死刑</span>
+                          <span v-else-if="c.life_imprisonment" class="text-[10px] font-medium text-destructive">无期徒刑</span>
+                          <span v-else-if="c.sentence_months != null"
                                 class="inline-flex items-center gap-1 text-[10px] font-medium text-slate-600 bg-slate-50 border border-slate-200/70 px-1.5 py-0.5 rounded-md">
                             刑期 {{ c.sentence_months }}个月
                           </span>
-                          <span v-if="c.fine_amount"
+                          <span v-if="c.fine_amount != null"
                                 class="inline-flex items-center gap-1 text-[10px] font-medium text-amber-700 bg-amber-50 border border-amber-200/70 px-1.5 py-0.5 rounded-md">
                             罚金 {{ c.fine_amount }}元
                           </span>

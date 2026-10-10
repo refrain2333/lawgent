@@ -31,6 +31,10 @@ class LegacyDataObject:
 
     def __setstate__(self, state):
         self.__dict__.update(state)
+        # pickle 恢复对象时不调用 __init__，旧字段也必须在这里规范化。
+        normalize = getattr(self, "_normalize", None)
+        if callable(normalize):
+            normalize()
 
     def __reduce__(self):
         return (self.__class__, (), self.__dict__)

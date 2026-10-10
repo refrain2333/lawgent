@@ -16,27 +16,19 @@ from app.schemas.v1.graph import (
 
 
 def _get_crime_map() -> dict:
-    loader = get_data_loader()
-    kg = loader.knowledge_graph
-    if kg is None:
-        return {}
-    return getattr(kg, "crime_article_map", None) or (
-        kg.get("crime_article_mapping", {}) if isinstance(kg, dict) else {}
-    )
+    return get_data_loader().get_crime_article_map()
 
 
 def _get_article_map() -> dict:
-    loader = get_data_loader()
-    kg = loader.knowledge_graph
-    if kg is None:
-        return {}
-    return getattr(kg, "article_crime_map", None) or (
-        kg.get("article_crime_mapping", {}) if isinstance(kg, dict) else {}
-    )
+    article_map: dict[str, dict[str, int]] = {}
+    for crime, articles in _get_crime_map().items():
+        for article, count in articles.items():
+            article_map.setdefault(article, {})[crime] = count
+    return article_map
 
 
 def _normalize_crime(crime: str) -> str:
-    return crime.strip().replace("罪", "").replace("犯罪", "")
+    return crime.strip().removesuffix("罪")
 
 
 def _normalize_article(article: str) -> str:
@@ -153,7 +145,7 @@ def get_relation_cases(crime: str, article: str, limit: int) -> RelationCasesRes
                 case_id = str(getattr(case, "case_id", ""))
 
             crime_match = any(
-                crime_normalized in str(acc).replace("罪", "") or str(acc).replace("罪", "") in crime_normalized
+                crime_normalized == _normalize_crime(str(acc))
                 for acc in accusations if acc
             )
             article_match = any(
@@ -169,8 +161,8 @@ def get_relation_cases(crime: str, article: str, limit: int) -> RelationCasesRes
                     accusations=[str(a) for a in accusations if a],
                     relevant_articles=[str(a) for a in articles if a],
                     criminals=extra.get("criminals", []),
-                    imprisonment_months=int(extra["imprisonment_months"]) if extra.get("imprisonment_months") else None,
-                    fine_amount=float(extra["fine_amount"]) if extra.get("fine_amount") else None,
+                    imprisonment_months=int(extra["imprisonment_months"]) if extra.get("imprisonment_months") is not None else None,
+                    fine_amount=float(extra["fine_amount"]) if extra.get("fine_amount") is not None else None,
                     death_penalty=extra.get("death_penalty", False),
                     life_imprisonment=extra.get("life_imprisonment", False),
                     ))
@@ -192,7 +184,8 @@ def get_full_graph(top_crimes: int, crime: str) -> GraphResponse:
         return GraphResponse(nodes=[], edges=[], total_crimes=0, total_articles=0, total_edges=0)
 
     if crime.strip():
-        selected = {c: v for c, v in crime_map.items() if crime in c}
+        crime_filter = _normalize_crime(crime)
+        selected = {c: v for c, v in crime_map.items() if crime_filter in c}
     else:
         sorted_crimes = sorted(
             crime_map.items(),

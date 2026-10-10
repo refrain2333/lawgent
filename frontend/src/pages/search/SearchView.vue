@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { apiUrl } from '@/lib/api'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import NavBar from '@/components/ui/NavBar.vue'
 import Badge from '@/components/ui/Badge.vue'
 import MarkdownViewer from '@/components/ui/MarkdownViewer.vue'
@@ -12,10 +13,19 @@ const result = ref<any>(null)
 const activeTab = ref<'vector' | 'bm25' | 'kg'>('vector')
 const elapsed = ref<number | null>(null)
 const graphArticleIds = ref<Set<number>>(new Set())
+let searchRequest = 0
+
+watch(activeTab, () => {
+  searchRequest++
+  result.value = null
+  elapsed.value = null
+  loading.value = false
+})
+onUnmounted(() => { searchRequest++ })
 
 async function fetchGraphArticleIds() {
   try {
-    const res = await fetch('/api/v1/graph/article_ids')
+    const res = await fetch(apiUrl('/graph/article_ids'))
     const data = await res.json()
     graphArticleIds.value = new Set(data.ids || [])
   } catch (e) {}
@@ -28,15 +38,18 @@ async function doSearch() {
   loading.value = true
   result.value = null
   elapsed.value = null
+  const requestId = ++searchRequest
   try {
     const t0 = performance.now()
-    const res = await fetch(`/api/v1/search/${activeTab.value}?q=${encodeURIComponent(query.value)}`)
-    result.value = await res.json()
+    const res = await fetch(apiUrl(`/search/${activeTab.value}?q=${encodeURIComponent(query.value)}`))
+    const data = await res.json()
+    if (requestId !== searchRequest) return
+    result.value = res.ok ? data : { error: typeof data.detail === 'string' ? data.detail : `请求失败（${res.status}）` }
     elapsed.value = Math.round(performance.now() - t0)
   } catch (e) {
-    result.value = { error: '请求失败' }
+    if (requestId === searchRequest) result.value = { error: '请求失败' }
   } finally {
-    loading.value = false
+    if (requestId === searchRequest) loading.value = false
   }
 }
 

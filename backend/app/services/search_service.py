@@ -86,10 +86,10 @@ def _build_case(doc_id: str, score: float, meta_index: dict) -> Optional[CaseRes
         accusations=acc or [],
         relevant_articles=arts or [],
         criminals=extra.get("criminals", []),
-        sentence_months=meta.get("sentence_months"),
-        fine_amount=meta.get("fine_amount"),
-        death_penalty=extra.get("death_penalty", False),
-        life_imprisonment=extra.get("life_imprisonment", False),
+        sentence_months=meta["sentence_months"] if meta.get("sentence_months") is not None else extra.get("imprisonment_months"),
+        fine_amount=meta["fine_amount"] if meta.get("fine_amount") is not None else extra.get("fine_amount"),
+        death_penalty=extra.get("death_penalty", meta.get("death_penalty", False)),
+        life_imprisonment=extra.get("life_imprisonment", meta.get("life_imprisonment", False)),
         fact=loader.get_case_content(case_id),
         similarity=round(score, 4),
         )
@@ -163,12 +163,14 @@ async def vector_search_async(query: str, articles_count: int = 5, cases_count: 
     if not loader.vectors_loaded:
         return _empty_response(query)
 
-    query_vec = _encode(query)
+    query_vec = await asyncio.to_thread(_encode, query)
     if query_vec is None:
         return _empty_response(query)
 
-    art_raw = _vector_search_raw(query_vec, "articles", articles_count)
-    case_raw = _vector_search_raw(query_vec, "cases", cases_count)
+    art_raw, case_raw = await asyncio.gather(
+        asyncio.to_thread(_vector_search_raw, query_vec, "articles", articles_count),
+        asyncio.to_thread(_vector_search_raw, query_vec, "cases", cases_count),
+    )
 
     art_meta = _build_meta_index("articles")
     case_meta = _build_meta_index("cases")
@@ -199,12 +201,12 @@ async def kg_search_async(query: str, articles_count: int = 5) -> SearchResponse
     if not loader.kg_loaded:
         return _empty_response(query)
 
-    art_raw = _kg_search_raw(query, articles_count)
+    art_raw = await asyncio.to_thread(_kg_search_raw, query, articles_count)
     art_meta = _build_meta_index("articles")
     articles = [r for r in (_build_article(d, s, art_meta) for d, s in art_raw) if r]
 
     elapsed = round((time.time() - t0) * 1000, 2)
-    logger.info(f"KG检索完成: '{query}' -> {len(articles)} 法条, {elapsed}ms")
+    logger.info(f"KG检索完成: query_len={len(query)} -> {len(articles)} 法条, {elapsed}ms")
 
     return SearchResponse(
         query=query,
@@ -226,8 +228,10 @@ async def bm25_search_async(query: str, articles_count: int = 5, cases_count: in
     if not loader.bm25_built:
         return _empty_response(query)
 
-    art_raw = _bm25_search_raw(query, "articles", articles_count)
-    case_raw = _bm25_search_raw(query, "cases", cases_count)
+    art_raw, case_raw = await asyncio.gather(
+        asyncio.to_thread(_bm25_search_raw, query, "articles", articles_count),
+        asyncio.to_thread(_bm25_search_raw, query, "cases", cases_count),
+    )
 
     # BM25 原始分无上界，归一化到 [0,1]
     def _normalize(raw: list[tuple[str, float]]) -> list[tuple[str, float]]:

@@ -3,6 +3,7 @@ import asyncio
 
 from fastapi import HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
@@ -24,7 +25,15 @@ async def register(db: AsyncSession, data: RegisterRequest) -> TokenResponse:
         nickname=data.nickname,
     )
     db.add(user)
-    await db.flush()
+    try:
+        await db.flush()
+    except IntegrityError:
+        # 并发注册可能同时通过前面的查询，最终仍以数据库唯一约束为准。
+        await db.rollback()
+        result = await db.execute(select(User).where(User.email == data.email))
+        if result.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="该邮箱已注册") from None
+        raise
 
     token = create_access_token({"user_id": user.id})
     return TokenResponse(access_token=token)

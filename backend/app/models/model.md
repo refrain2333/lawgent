@@ -10,7 +10,7 @@
 - [User 用户表](#user-用户表)
 - [Conversation 会话表](#conversation-会话表)
 - [Message 消息表](#message-消息表)
-- [RiskReport 风险评估报告表](#riskreport-风险评估报告表)
+- [StageConfirmation 阶段确认表](#stageconfirmation-阶段确认表)
 - [枚举类型](#枚举类型)
 - [关系图](#关系图)
 - [级联删除策略](#级联删除策略)
@@ -34,7 +34,7 @@
 |------|------|------|------|
 | id | int | PK, Auto | 主键，自增 |
 | email | str | Unique, Index, 255 | 用户邮箱，唯一 |
-| password | str | 255 | 密码哈希（bcrypt） |
+| password | str | 255 | 密码哈希（SHA-256 + Base64 后 bcrypt；登录兼容并升级旧 bcrypt） |
 | nickname | str | Nullable, 100 | 用户昵称 |
 | avatar | str | Nullable, 500 | 头像 URL |
 | created_at | datetime | Auto, UTC | 创建时间 |
@@ -58,16 +58,16 @@
 |------|------|------|------|
 | id | int | PK, Auto | 主键，自增 |
 | user_id | int | FK -> users, Cascade | 用户ID |
+| thread_id | str | Unique, Index, 255 | 会话唯一标识，与标题独立 |
 | title | str | Nullable, 255 | 会话标题 |
-| stage | ConversationStage | Default=s1 | 当前阶段 |
-| facts_json | JSON | Default={} | 结构化案情事实 |
+| stage | ConversationStage | Default=s1_collecting | 当前阶段 |
 | created_at | datetime | Auto, UTC | 创建时间 |
 | updated_at | datetime | Nullable, onupdate | 最后更新时间 |
 
 **关系**：
 - `User` 1:N `Conversation`
 - `Conversation` 1:N `Message`（cascade delete）
-- `Conversation` 1:N `RiskReport`（cascade delete）
+- `Conversation` 1:N `StageConfirmation`（cascade delete）
 
 ---
 
@@ -81,11 +81,12 @@
 | conversation_id | int | FK -> conversations, Cascade | 会话ID |
 | role | MessageRole | - | 消息角色（user/assistant/system） |
 | content | Text | Not Null | 消息正文 |
+| stage | ConversationStage | Default=s1_collecting | 消息所属阶段，用于区分 S1、S3 和报告追问 |
 | created_at | datetime | Auto, UTC | 创建时间 |
 
 **设计说明**：
 - 无 `updated_at`，消息创建后不可修改，保证对话记录的不可篡改性
-- 撤回逻辑：物理删除该消息及之后的所有消息
+- 当前 API 提供整段会话删除，不提供单条消息撤回。
 
 **关系**：`Conversation` 1:N `Message`
 
@@ -93,7 +94,7 @@
 
 ## StageConfirmation 阶段确认表
 
-记录每个阶段的输入输出，便于追溯和回滚。
+记录每个阶段的输入输出，便于追溯；当前 API 不提供历史阶段回滚。
 
 | 字段 | 类型 | 约束 | 说明 |
 |------|------|------|------|
@@ -108,6 +109,7 @@
 **阶段类型说明**：
 - `s1_confirm`：S1 案情收集确认，输入为用户描述，输出为案情摘要
 - `s2_search`：S2 法律检索，输入为 facts，输出为检索结果
+- `s2_checklist`：S2 生成的量刑要素清单
 - `s3_confirm`：S3 量刑情节确认，输入为用户补充，输出为量刑情节摘要
 - `s4_report`：S4 风险报告，输入为 facts + search_results，输出为风险评估报告
 
@@ -123,6 +125,7 @@
 |----|------|
 | s1_confirm | S1 案情确认 |
 | s2_search | S2 检索结果 |
+| s2_checklist | S2 量刑要素清单 |
 | s3_confirm | S3 量刑确认 |
 | s4_report | S4 风险报告 |
 
@@ -132,17 +135,17 @@
 
 | 值 | 说明 |
 |----|------|
-| s1 | 案情收集 |
-| s2 | 法律检索 |
-| s3 | 量刑情节 |
-| s4 | 报告生成 |
-| done | 完成 |
+| s1_collecting | 案情收集 |
+| s1_confirming | 等待案情确认 |
+| s2_searching | 法律检索 |
+| s2_failed | 检索失败 |
+| s3_collecting | 量刑情节收集 |
+| s3_confirming | 等待量刑情节确认 |
+| s4_generating | 报告生成 |
+| s4_done | 报告完成，可继续追问 |
+| s4_failed | 报告生成失败 |
 
-**状态流转**：`s1 → s2 → s3 → s4 → done`
-
-**回滚逻辑**：
-- 撤回消息 = 标记 `is_recalled=True`，重新生成后续内容
-- 3 → 1：检查 s1 确认内容是否仍有效
+**状态流转**：`s1_collecting → s1_confirming → s2_searching → s3_collecting → s3_confirming → s4_generating → s4_done`。拒绝确认时返回对应 collecting 阶段；检索或报告异常进入对应 failed 阶段。
 
 ### MessageRole 消息角色
 
@@ -175,10 +178,9 @@ erDiagram
     CONVERSATION {
         int id PK
         int user_id FK
+        string thread_id UK
         string title
-        enum status
         enum stage
-        json facts_json
         datetime created_at
         datetime updated_at
     }
@@ -188,6 +190,7 @@ erDiagram
         int conversation_id FK
         enum role
         text content
+        enum stage
         datetime created_at
     }
 
@@ -209,7 +212,7 @@ erDiagram
 | 场景 | 策略 | 说明 |
 |------|------|------|
 | 删除用户 | CASCADE | 用户所有会话一并删除 |
-| 删除会话 | CASCADE | 会话下所有消息、报告一并删除 |
+| 删除会话 | CASCADE | 会话下所有消息、阶段确认及报告一并删除 |
 
 ---
 
@@ -220,7 +223,7 @@ erDiagram
 | `int` | INTEGER | 整数 |
 | `str` | VARCHAR | 字符串（有长度限制） |
 | `str`（Text） | TEXT | 长文本（消息内容） |
-| `dict`（JSON） | JSONB | JSON 数据（报告/元数据） |
+| `dict`（JSON） | JSON | JSON 数据（阶段输入输出及报告） |
 | `datetime` | TIMESTAMPTZ | 带时区时间戳 |
 | `StrEnum` | VARCHAR | 枚举存为字符串 |
 | `bool` | BOOLEAN | 布尔值 |

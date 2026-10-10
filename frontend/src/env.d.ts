@@ -7,4 +7,4 @@ declare module '*.vue' {
 }
 
 declare module 'markdown-it'
-declare module 'markdown-it-katex'
+declare module '@traptitech/markdown-it-katex'

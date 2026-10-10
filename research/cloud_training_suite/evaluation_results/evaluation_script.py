@@ -13,7 +13,7 @@ if sys.platform == 'win32':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
-PROJECT_ROOT = Path(__file__).parent.parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 import pickle
@@ -123,7 +123,7 @@ vectors_dir = PROJECT_ROOT / "data" / "processed" / "vectors"
 with open(vectors_dir / "criminal_articles_vectors.pkl", 'rb') as f:
     base_data = pickle.load(f)
 base_vectors = base_data['vectors']
-metadata = base_data['metadata']
+base_metadata = base_data['metadata']
 
 print(f"✅ 基础向量: {base_vectors.shape}")
 
@@ -131,6 +131,11 @@ print(f"✅ 基础向量: {base_vectors.shape}")
 with open(vectors_dir / "criminal_articles_vectors_finetuned.pkl", 'rb') as f:
     finetuned_data = pickle.load(f)
 finetuned_vectors = finetuned_data['vectors']
+finetuned_metadata = finetuned_data['metadata']
+
+for vectors, metadata in [(base_vectors, base_metadata), (finetuned_vectors, finetuned_metadata)]:
+    if len(vectors) != len(metadata):
+        raise ValueError("向量数量与对应模型元数据不一致")
 
 print(f"✅ 微调向量: {finetuned_vectors.shape}")
 print()
@@ -168,7 +173,7 @@ if next(iter(state_dict.keys())).startswith('backbone.'):
             new_state_dict[new_key] = value
     state_dict = new_state_dict
 
-finetuned_model.load_state_dict(state_dict, strict=False)
+finetuned_model.load_state_dict(state_dict, strict=True)
 finetuned_model = finetuned_model.to(device)
 finetuned_model.eval()
 print("✅ 微调模型加载完成")
@@ -195,7 +200,7 @@ def search_articles(query_vec, vectors, top_k=10):
     top_indices = np.argsort(sims)[::-1][:top_k]
     return [(idx, sims[idx]) for idx in top_indices]
 
-def evaluate_query(query_info, model, vectors, model_name):
+def evaluate_query(query_info, model, vectors, metadata):
     """评估单个查询"""
     query = query_info['query']
     expected = query_info['expected_articles']
@@ -232,9 +237,9 @@ def evaluate_query(query_info, model, vectors, model_name):
     
     # Precision@K
     precision_at_1 = 1 if any(exp in result_nums[:1] for exp in expected) else 0
-    precision_at_3 = sum(1 for exp in expected if exp in result_nums[:3]) / min(3, len(expected))
-    precision_at_5 = sum(1 for exp in expected if exp in result_nums[:5]) / min(5, len(expected))
-    precision_at_10 = sum(1 for exp in expected if exp in result_nums[:10]) / min(10, len(expected))
+    precision_at_3 = sum(1 for num in result_nums[:3] if num in expected) / max(1, min(3, len(result_nums)))
+    precision_at_5 = sum(1 for num in result_nums[:5] if num in expected) / max(1, min(5, len(result_nums)))
+    precision_at_10 = sum(1 for num in result_nums[:10] if num in expected) / max(1, min(10, len(result_nums)))
     
     # 是否命中
     hit = any(exp in result_nums for exp in expected)
@@ -279,11 +284,11 @@ for difficulty, queries in TEST_QUERIES.items():
         print(f"  [{current}/{total_queries}] {query}")
         
         # 基础模型
-        base_result = evaluate_query(query_info, base_model, base_vectors, "base")
+        base_result = evaluate_query(query_info, base_model, base_vectors, base_metadata)
         all_results['base'][difficulty].append(base_result)
         
         # 微调模型
-        finetuned_result = evaluate_query(query_info, finetuned_model, finetuned_vectors, "finetuned")
+        finetuned_result = evaluate_query(query_info, finetuned_model, finetuned_vectors, finetuned_metadata)
         all_results['finetuned'][difficulty].append(finetuned_result)
         
         # 显示对比
@@ -449,8 +454,13 @@ md_content = f"""# 基础模型 vs 微调模型 - 全面对比实验报告
 """
 
 # 计算总体提升
-mrr_improvement = ((finetuned_aggregate['mrr'] - base_aggregate['mrr']) / base_aggregate['mrr'] * 100)
-p1_improvement = ((finetuned_aggregate['precision@1'] - base_aggregate['precision@1']) / base_aggregate['precision@1'] * 100)
+def relative_improvement(metric):
+    base_value = base_aggregate[metric]
+    return (finetuned_aggregate[metric] - base_value) / base_value * 100 if base_value else 0.0
+
+
+mrr_improvement = relative_improvement('mrr')
+p1_improvement = relative_improvement('precision@1')
 
 if mrr_improvement > 0:
     md_content += f"""
@@ -478,10 +488,10 @@ md_content += f"""---
 |------|----------|----------|----------|
 | **MRR** | {base_aggregate['mrr']:.3f} | {finetuned_aggregate['mrr']:.3f} | **{mrr_improvement:+.1f}%** |
 | **Precision@1** | {base_aggregate['precision@1']:.3f} | {finetuned_aggregate['precision@1']:.3f} | **{p1_improvement:+.1f}%** |
-| **Precision@3** | {base_aggregate['precision@3']:.3f} | {finetuned_aggregate['precision@3']:.3f} | {((finetuned_aggregate['precision@3'] - base_aggregate['precision@3']) / base_aggregate['precision@3'] * 100):+.1f}% |
-| **Precision@5** | {base_aggregate['precision@5']:.3f} | {finetuned_aggregate['precision@5']:.3f} | {((finetuned_aggregate['precision@5'] - base_aggregate['precision@5']) / base_aggregate['precision@5'] * 100):+.1f}% |
-| **Precision@10** | {base_aggregate['precision@10']:.3f} | {finetuned_aggregate['precision@10']:.3f} | {((finetuned_aggregate['precision@10'] - base_aggregate['precision@10']) / base_aggregate['precision@10'] * 100):+.1f}% |
-| **Hit Rate** | {base_aggregate['hit_rate']:.1%} | {finetuned_aggregate['hit_rate']:.1%} | {((finetuned_aggregate['hit_rate'] - base_aggregate['hit_rate']) / base_aggregate['hit_rate'] * 100):+.1f}% |
+| **Precision@3** | {base_aggregate['precision@3']:.3f} | {finetuned_aggregate['precision@3']:.3f} | {relative_improvement('precision@3'):+.1f}% |
+| **Precision@5** | {base_aggregate['precision@5']:.3f} | {finetuned_aggregate['precision@5']:.3f} | {relative_improvement('precision@5'):+.1f}% |
+| **Precision@10** | {base_aggregate['precision@10']:.3f} | {finetuned_aggregate['precision@10']:.3f} | {relative_improvement('precision@10'):+.1f}% |
+| **Hit Rate** | {base_aggregate['hit_rate']:.1%} | {finetuned_aggregate['hit_rate']:.1%} | {relative_improvement('hit_rate'):+.1f}% |
 
 ### 性能指标说明
 
@@ -608,7 +618,7 @@ md_content += f"""
 ### 使用建议
 
 - ✅ **推荐使用微调模型**: 在生产环境中启用微调模型以获得更好的检索效果
-- 🔧 **配置方式**: 在 `.env` 文件中设置 `USE_FINETUNED_MODEL=true`
+- 🔧 **配置方式**: 在 `.env` 文件中设置 `FINETUNED_MODEL_PATH` 为微调 backbone 权重路径
 - 📊 **性能监控**: 持续监控实际使用中的检索效果，收集用户反馈
 
 ### 技术细节
@@ -616,7 +626,7 @@ md_content += f"""
 - **基础模型**: thunlp/Lawformer
 - **微调模型**: thunlp/Lawformer (使用CAIL2018数据集进行对比学习微调)
 - **向量维度**: 768
-- **法条数量**: {len(metadata)}
+- **法条数量**: 基础向量 {len(base_metadata)} 条，微调向量 {len(finetuned_metadata)} 条
 
 ---
 

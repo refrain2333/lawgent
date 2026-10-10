@@ -13,7 +13,7 @@ config = context.config
 # 动态设置数据库 URL（Alembic 用同步驱动）
 config.set_main_option(
     "sqlalchemy.url",
-    settings.DATABASE_URL.replace("+asyncpg", "")
+    settings.DATABASE_URL.replace("+asyncpg", "").replace("%", "%%")
 )
 
 if config.config_file_name is not None:
@@ -42,6 +42,7 @@ def run_migrations_online() -> None:
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        hide_parameters=True,
     )
     with connectable.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata)

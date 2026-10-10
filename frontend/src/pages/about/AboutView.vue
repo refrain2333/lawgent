@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { apiUrl } from '@/lib/api'
 import { computed, ref, onMounted } from 'vue'
 import NavBar from '@/components/ui/NavBar.vue'
 import Badge from '@/components/ui/Badge.vue'
@@ -33,7 +34,7 @@ const stats = ref<Stats | null>(null)
 
 onMounted(async () => {
   try {
-    const res = await fetch('/api/v1/stats')
+    const res = await fetch(apiUrl('/stats'))
     stats.value = await res.json()
   } catch {}
 })

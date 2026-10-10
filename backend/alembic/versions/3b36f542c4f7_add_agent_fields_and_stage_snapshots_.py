@@ -36,7 +36,7 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_stage_snapshots_conversation_id'), 'stage_snapshots', ['conversation_id'], unique=False)
-    op.add_column('conversations', sa.Column('sub_status', sqlmodel.sql.sqltypes.AutoString(), nullable=False, comment='阶段内细粒度状态'))
+    op.add_column('conversations', sa.Column('sub_status', sqlmodel.sql.sqltypes.AutoString(), server_default='', nullable=False, comment='阶段内细粒度状态'))
     op.add_column('conversations', sa.Column('facts_json', sa.JSON(), server_default='{}', nullable=False, comment='结构化案情事实'))
     op.alter_column('conversations', 'id',
                existing_type=sa.INTEGER(),
@@ -54,8 +54,8 @@ def upgrade() -> None:
                comment='Agent当前阶段',
                existing_comment='Agent阶段',
                existing_nullable=False)
-    op.add_column('messages', sa.Column('is_recalled', sa.Boolean(), nullable=False, comment='是否已撤回'))
-    op.add_column('messages', sa.Column('is_incomplete', sa.Boolean(), nullable=False, comment='是否流式中断（不完整）'))
+    op.add_column('messages', sa.Column('is_recalled', sa.Boolean(), server_default=sa.false(), nullable=False, comment='是否已撤回'))
+    op.add_column('messages', sa.Column('is_incomplete', sa.Boolean(), server_default=sa.false(), nullable=False, comment='是否流式中断（不完整）'))
     op.alter_column('messages', 'id',
                existing_type=sa.INTEGER(),
                comment='主键，自增',

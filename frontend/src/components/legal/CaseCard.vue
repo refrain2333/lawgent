@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 
 const props = defineProps<{
@@ -23,7 +23,7 @@ const preview = (s: string) => s.length > PREVIEW_LEN ? s.slice(0, PREVIEW_LEN) 
 function sentenceText(): string {
   if (props.deathPenalty) return '死刑'
   if (props.lifeImprisonment) return '无期徒刑'
-  if (props.imprisonmentMonths) {
+  if (props.imprisonmentMonths != null) {
     const m = props.imprisonmentMonths
     return m >= 12
       ? `${Math.floor(m / 12)} 年${m % 12 ? m % 12 + ' 月' : ''}`
@@ -32,7 +32,7 @@ function sentenceText(): string {
   return ''
 }
 
-const isSevere = props.deathPenalty || props.lifeImprisonment
+const isSevere = computed(() => props.deathPenalty || props.lifeImprisonment)
 </script>
 
 <template>
@@ -68,7 +68,7 @@ const isSevere = props.deathPenalty || props.lifeImprisonment
     <!-- Footer -->
     <div class="px-4 pb-3 flex flex-wrap items-center gap-2 pt-2 border-t border-border/40">
       <Badge v-if="sentenceText()" :variant="isSevere ? 'destructive' : 'default'">量刑：{{ sentenceText() }}</Badge>
-      <Badge v-if="fineAmount" variant="outline">罚金：{{ fineAmount.toLocaleString() }} 元</Badge>
+      <Badge v-if="fineAmount != null" variant="outline">罚金：{{ fineAmount.toLocaleString() }} 元</Badge>
       <Badge v-for="a in relevantArticles" :key="a" variant="secondary">法条：第{{ a }}条</Badge>
       <Badge v-for="c in criminals" :key="c" variant="outline">涉案：{{ c }}</Badge>
     </div>

@@ -12,11 +12,8 @@ def get_stats() -> StatsResponse:
     total_articles_kg = 0
     total_relations = 0
 
-    kg = loader.knowledge_graph
-    if kg is not None:
-        crime_map = getattr(kg, "crime_article_map", None) or (
-            kg.get("crime_article_mapping", {}) if isinstance(kg, dict) else {}
-        )
+    crime_map = loader.get_crime_article_map()
+    if crime_map:
         total_crimes = len(crime_map)
 
         crime_counts = [(c, sum(v.values()) if isinstance(v, dict) else len(v)) for c, v in crime_map.items()]

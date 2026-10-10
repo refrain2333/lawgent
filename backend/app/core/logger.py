@@ -1,9 +1,11 @@
 # 日志配置
 import json
 import logging
+import re
 import sys
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import parse_qsl, urlencode
 
 from loguru import logger
 
@@ -24,11 +26,27 @@ class _InterceptHandler(logging.Handler):
             level = logger.level(record.levelname).name
         except ValueError:
             level = record.levelno
-        frame, depth = sys._getframe(6), 6
+        try:
+            frame, depth = sys._getframe(6), 6
+        except ValueError:
+            frame, depth = sys._getframe(1), 1
         while frame and frame.f_code.co_filename == logging.__file__:
             frame = frame.f_back
             depth += 1
-        logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
+        message = record.getMessage()
+        if record.name == "uvicorn.access":
+            def _redact_query(match: re.Match[str]) -> str:
+                query = parse_qsl(match.group()[1:], keep_blank_values=True)
+                private_keys = {"token", "q", "query", "vector", "bm25", "kg", "query2doc", "hyde"}
+                if not any(key in private_keys for key, _ in query):
+                    return match.group()
+                return "?" + urlencode([
+                    (key, "REDACTED" if key in private_keys else value) for key, value in query
+                ])
+
+            # 只处理格式化后的副本，保留原 LogRecord 的参数供其他 handler 使用。
+            message = re.sub(r'\?[^\s"]+', _redact_query, message)
+        logger.opt(depth=depth, exception=record.exc_info).log(level, message)
 
 
 # 配置控制台日志
@@ -37,11 +55,14 @@ logger.add(
     sys.stdout,
     level="DEBUG",
     colorize=True,
+    diagnose=False,
     format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
     )
 
 # 拦截 uvicorn / fastapi / sqlalchemy 的标准 logging，全部转给 loguru
-logging.basicConfig(handlers=[_InterceptHandler()], level=0, force=True)
+logging.basicConfig(handlers=[_InterceptHandler()], level=logging.INFO, force=True)
+for _name in ("openai", "httpx", "httpcore", "langchain", "langchain_openai"):
+    logging.getLogger(_name).setLevel(logging.WARNING)
 for _name in ("uvicorn", "uvicorn.error", "uvicorn.access", "fastapi", "sqlalchemy.engine"):
     _log = logging.getLogger(_name)
     _log.handlers = [_InterceptHandler()]
@@ -62,6 +83,7 @@ def init_file_logging():
         level="INFO",
         encoding="utf-8",
         enqueue=True,
+        diagnose=False,
         format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
         )
 
@@ -79,7 +101,6 @@ def log_ai_call(
     dd = now.strftime("%d")
 
     log_dir = BASE_LOG_DIR / "ai" / mm / dd
-    log_dir.mkdir(parents=True, exist_ok=True)
     log_file = log_dir / f"ai_{_STARTUP_TS}.jsonl"
 
     # 序列化 input_messages
@@ -110,6 +131,7 @@ def log_ai_call(
         record.update(extra)
 
     try:
+        log_dir.mkdir(parents=True, exist_ok=True)
         with open(log_file, "a", encoding="utf-8") as f:
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
     except Exception as e:

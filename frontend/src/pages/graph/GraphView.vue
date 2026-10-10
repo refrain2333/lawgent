@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { apiUrl } from '@/lib/api'
 import { ref, onMounted, onUnmounted, shallowRef } from 'vue'
 import { useRoute } from 'vue-router'
 import * as echarts from 'echarts'
@@ -15,6 +16,17 @@ interface RelationsData {
   entity_type: string
 }
 interface Stats { total_crimes: number; total_articles: number; total_relations: number }
+interface CaseItem {
+  case_id: string
+  accusations: string[]
+  fact: string
+  relevant_articles: string[]
+  criminals: string[]
+  imprisonment_months: number | null
+  fine_amount: number | null
+  death_penalty: boolean
+  life_imprisonment: boolean
+}
 
 const container = ref<HTMLElement | null>(null)
 const query = ref('')
@@ -27,16 +39,28 @@ const hasSearched = ref(false)
 const errorMsg = ref('')
 const topCrimes = ref(15)
 const isGlobalMode = ref(true)
+let graphRequest = 0
+let articleRequest = 0
+let casesRequest = 0
+let globalData: { nodes: GraphNode[]; edges: GraphEdge[] } | null = null
+
+function escapeHtml(value: unknown) {
+  const escapes: Record<string, string> = {
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }
+  return String(value).replace(/[&<>"']/g, char => escapes[char] ?? char)
+}
 
 // 选中法条详情
 const selectedArticle = ref<{ title: string; chapter: string; content: string } | null>(null)
 
 async function fetchArticleDetail(articleNum: string) {
+  const requestId = ++articleRequest
   selectedArticle.value = null
   try {
-    const res = await fetch(`/api/v1/data/articles?q=${articleNum}&page=1&page_size=1`)
+    const res = await fetch(apiUrl(`/data/articles?article_number=${encodeURIComponent(articleNum)}&page=1&page_size=1`))
     const data = await res.json()
-    if (data.items?.length) selectedArticle.value = data.items[0]
+    if (requestId === articleRequest && res.ok && data.items?.length) selectedArticle.value = data.items[0]
   } catch (e) {}
 }
 
@@ -44,37 +68,46 @@ async function fetchArticleDetail(articleNum: string) {
 const caseModal = ref(false)
 const caseModalTitle = ref('')
 const caseModalLoading = ref(false)
+const caseModalError = ref('')
 const caseList = ref<CaseItem[]>([])
 
 const EXAMPLES = ['盗窃', '故意伤害', '诈骗', '抢劫', '危险驾驶', '第264条', '第234条']
 
 async function loadRelationCases(crimeId: string, articleId: string) {
+  const requestId = ++casesRequest
   const crime = crimeId.replace('crime_', '')
   const article = articleId.replace('article_', '')
-  caseModalTitle.value = `${crime}罪 · 第${article}条 · 关联案例`
+  caseModalTitle.value = `${crime.endsWith('罪') ? crime : crime + '罪'} · 第${article}条 · 关联案例`
   caseModal.value = true
   caseModalLoading.value = true
+  caseModalError.value = ''
   caseList.value = []
   try {
-    const res = await fetch(`/api/v1/graph/relation_cases/${encodeURIComponent(crime)}/${article}?limit=5`)
-    if (res.ok) {
-      const data = await res.json()
-      caseList.value = data.cases
-    }
-  } catch (e) {}
-  finally { caseModalLoading.value = false }
+    const res = await fetch(apiUrl(`/graph/relation_cases/${encodeURIComponent(crime)}/${article}?limit=5`))
+    const data = await res.json()
+    if (requestId !== casesRequest) return
+    if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : '关联案例加载失败')
+    caseList.value = data.cases
+  } catch (e) {
+    if (requestId === casesRequest) caseModalError.value = e instanceof Error ? e.message : '关联案例加载失败'
+  }
+  finally { if (requestId === casesRequest) caseModalLoading.value = false }
 }
 
 async function loadGlobalGraph() {
+  const requestId = ++graphRequest
+  articleRequest++
   loading.value = true
   errorMsg.value = ''
   isGlobalMode.value = true
   hasSearched.value = true
   selectedNode.value = null
+  selectedArticle.value = null
   try {
-    const res = await fetch(`/api/v1/graph?top_crimes=${topCrimes.value}`)
-    if (!res.ok) return
+    const res = await fetch(apiUrl(`/graph?top_crimes=${topCrimes.value}`))
     const data = await res.json()
+    if (requestId !== graphRequest) return
+    if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : '图谱加载失败')
     // 转换为 RelationsData 格式复用 renderGraph
     const fakeCenter: GraphNode = { id: 'global', label: `Top ${topCrimes.value} 罪名`, type: 'center', weight: 0, confidence: 1 }
     const relData: RelationsData = {
@@ -84,10 +117,15 @@ async function loadGlobalGraph() {
       entity_type: 'global',
     }
     currentData.value = relData
+    globalData = data
     renderGlobalGraph(data)
   } catch (e) {
+    if (requestId === graphRequest) {
+      errorMsg.value = e instanceof Error ? e.message : '图谱加载失败'
+      clearChart()
+    }
   } finally {
-    loading.value = false
+    if (requestId === graphRequest) loading.value = false
   }
 }
 
@@ -170,7 +208,7 @@ function renderGlobalGraph(data: { nodes: GraphNode[]; edges: GraphEdge[] }) {
         if (params.dataType === 'node') {
           const color = params.data.category === 0 ? '#F79767' : '#57C7E3'
           const type = params.data.category === 0 ? '罪名' : '法条'
-          return `<span style="color:${color};font-weight:bold">${params.data.name}</span><br/><span style="color:#94a3b8">${type} · 案例数：${params.data.value}</span>`
+          return `<span style="color:${color};font-weight:bold">${escapeHtml(params.data.name)}</span><br/><span style="color:#94a3b8">${type} · 案例数：${params.data.value}</span>`
         }
         if (params.dataType === 'edge') return `<span style="color:#94a3b8">共现案例：${params.data.value}</span>`
         return ''
@@ -200,7 +238,7 @@ function renderGlobalGraph(data: { nodes: GraphNode[]; edges: GraphEdge[] }) {
 
 async function loadStats() {
   try {
-    const res = await fetch('/api/v1/graph/stats')
+    const res = await fetch(apiUrl('/graph/stats'))
     if (res.ok) stats.value = await res.json()
   } catch (e) {}
 }
@@ -208,29 +246,38 @@ async function loadStats() {
 async function search(q?: string) {
   const term = (q ?? query.value).trim()
   if (!term) return
+  const requestId = ++graphRequest
+  articleRequest++
+  isGlobalMode.value = false
   query.value = term
   loading.value = true
   errorMsg.value = ''
   selectedNode.value = null
+  selectedArticle.value = null
   hasSearched.value = true
 
   try {
-    const res = await fetch(`/api/v1/graph/relations/${encodeURIComponent(term)}?top_k=12`)
+    const res = await fetch(apiUrl(`/graph/relations/${encodeURIComponent(term)}?top_k=12`))
     if (!res.ok) {
       const err = await res.json()
+      if (requestId !== graphRequest) return
       errorMsg.value = err.detail || '未找到相关数据'
       clearChart()
       return
     }
     const data: RelationsData = await res.json()
+    if (requestId !== graphRequest) return
     currentData.value = data
     selectedNode.value = data.center_node
+    if (data.center_node.id.startsWith('article_')) void fetchArticleDetail(data.center_node.id.replace('article_', ''))
     renderGraph(data)
   } catch (e) {
-    errorMsg.value = '请求失败，请检查后端服务'
-    clearChart()
+    if (requestId === graphRequest) {
+      errorMsg.value = '请求失败，请检查后端服务'
+      clearChart()
+    }
   } finally {
-    loading.value = false
+    if (requestId === graphRequest) loading.value = false
   }
 }
 
@@ -362,7 +409,7 @@ function renderGraph(data: RelationsData) {
           const color = node.type === 'center' ? '#F79767' : node.type === 'crime' ? '#4C8EDA' : '#57C7E3'
           const conf = node.confidence > 0 && node.type !== 'center'
             ? `<br/><span style="color:#94a3b8">置信度：${(node.confidence * 100).toFixed(1)}%</span>` : ''
-          return `<div style="line-height:1.8"><span style="color:${color};font-weight:bold">${params.data.name}</span><br/><span style="color:#94a3b8">${typeLabel} · 案例数：${node.weight}</span>${conf}</div>`
+          return `<div style="line-height:1.8"><span style="color:${color};font-weight:bold">${escapeHtml(params.data.name)}</span><br/><span style="color:#94a3b8">${typeLabel} · 案例数：${node.weight}</span>${conf}</div>`
         }
         if (params.dataType === 'edge') {
           return `<span style="color:#94a3b8">共现案例：${params.data.value}</span>`
@@ -413,7 +460,8 @@ function renderGraph(data: RelationsData) {
 function resetView() {
   if (!chart.value || !currentData.value) return
   chart.value.dispatchAction({ type: 'restore' })
-  renderGraph(currentData.value)
+  if (isGlobalMode.value && globalData) renderGlobalGraph(globalData)
+  else renderGraph(currentData.value)
   selectedNode.value = null
 }
 
@@ -435,6 +483,9 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  graphRequest++
+  articleRequest++
+  casesRequest++
   chart.value?.dispose()
   window.removeEventListener('resize', handleResize)
 })
@@ -639,6 +690,7 @@ onUnmounted(() => {
               <RefreshCw class="w-4 h-4 animate-spin" />
               加载案例中...
             </div>
+            <div v-else-if="caseModalError" role="alert" class="text-center py-8 text-sm text-destructive">{{ caseModalError }}</div>
             <div v-else-if="caseList.length === 0" class="text-center py-8 text-sm text-muted-foreground">
               未找到相关案例
             </div>

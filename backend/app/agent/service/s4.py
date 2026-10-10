@@ -1,15 +1,13 @@
 # S4 风险评估报告生成
 import json
-import logging
 from collections.abc import AsyncGenerator
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from app.agent.service.utils import llm_stream, load_prompt, parse_json
+from app.agent.service.utils import format_sentence, llm_stream, load_prompt, parse_json
 from app.core.logger import log_ai_call
 from app.infrastructure.llm_client import get_chat_model
-
-logger = logging.getLogger(__name__)
+from app.schemas.v1.agent import RiskReport
 
 _PROMPT_TEMPLATE = load_prompt("s4", with_base=False)
 _CHAT_PROMPT_TEMPLATE = load_prompt("s4_chat", with_base=False)
@@ -24,7 +22,7 @@ def _build_prompt(summary: str, s2_data: dict, checklist: dict, s3_facts: str) -
     ) or "暂无"
 
     cases_text = "\n".join(
-        f"- 罪名：{'、'.join(c.get('accusations', []))}，判决：{c.get('sentence_months', '未知')}个月"
+        f"- 罪名：{'、'.join(c.get('accusations', []))}，判决：{format_sentence(c)}"
         for c in fused.get("cases", [])[:5]
     ) or "暂无"
 
@@ -85,6 +83,4 @@ async def gen_report(
     log_ai_call(stage="s4_report", thread_id=thread_id, input_messages=messages, output=raw)
 
     result = parse_json(raw)
-    if not result:
-        logger.warning("S4 报告输出不是有效 JSON 对象")
-    return result
+    return RiskReport.model_validate(result).model_dump()

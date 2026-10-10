@@ -138,6 +138,7 @@ const realtimeCards = [
 
 const sseEvents = [
   { type: 'token', when: 'AI 流式输出每个字符片段', note: '前端打字机队列消费' },
+  { type: 'stage_changed', when: '确认阶段补充案情，撤回到收集阶段', note: '更新当前阶段并撤下旧确认卡' },
   { type: 'case_ready', when: 'S1 信息收集完毕，携带 summary', note: '触发 s1_confirming + 存库' },
   { type: 's3_ready', when: 'S3 情节收集完毕，携带 facts', note: '触发 s3_confirming + 存库' },
   { type: 'end', when: 'AI 正常输出结束', note: '关闭流式消息气泡' },
@@ -158,14 +159,14 @@ const asyncTasks = [
     trigger: '用户确认 S1 案情（/confirm accepted=true）',
     fn: '_run_s2_and_save',
     steps: ['run_s2 执行 5 路并行检索 + RRF 融合', 'gen_checklist 生成量刑要素清单', 'gen_s3_opener 生成 S3 开场白并写入消息表', '推进 stage → s3_collecting'],
-    poll: '前端每 3s 轮询 /state，检测到 stage 变化后停止',
+    poll: '前端每 3s 轮询 /state，等待检索与开场引导就绪；超时后可手动刷新',
   },
   {
     title: 'S4 报告任务',
     trigger: '用户确认 S3 情节（/confirm accepted=true）',
     fn: '_run_s4_and_save',
     steps: ['切换 stage → s4_generating', '读取 S1 摘要、S2 检索结果、S2 量刑清单、S3 情节', 'gen_report 综合生成结构化 JSON 报告', '写入 StageConfirmation（s4_report）后切换 stage → s4_done'],
-    poll: '前端每 3s 轮询 /report，成功返回 200 则展示报告；若仍在 s4_generating 则继续等待',
+    poll: '前端每 3s 轮询 /report，成功返回 200 则展示报告；超时后可刷新状态继续等待',
   },
 ]
 
@@ -264,7 +265,7 @@ $$
 score(d) = \\sum_i \\frac{1}{k + rank_i(d)}, \\quad k = 60
 $$
 
-- \`rank_i(d)\`：文档 \`d\` 在第 \`i\` 路检索中的排名（从 1 开始）
+- \`rank_i(d)\`：文档 \`d\` 在第 \`i\` 路检索中的位置（当前实现从 0 开始）
 - 若某一路未命中 \`d\`，则该路贡献记为 0
 - 文档在更多检索器中排名越靠前，累积分越高
 - RRF 仅依赖”排名”而非”原始分数”，可缓解多检索器分数尺度不一致问题
@@ -276,8 +277,8 @@ const rrfImplNotes = [
     detail: '每路检索各取 top_k = count × 3 个候选，融合排序后再截取最终 count 条，保证召回覆盖度不因单路数量不足而损失。',
   },
   {
-    title: '相关度展示与 RRF 分解耦',
-    detail: 'RRF 分（≈ 0.04~0.08）仅用于排名决策，前端展示的相关度取各路原始余弦相似度的最大值，保证数值可读、有意义。',
+    title: '融合分与相似度的区别',
+    detail: '融合结果的 similarity 字段保存 RRF 分，咨询页按 RRF 展示；单路检索保存该路原始得分。两者均用于排序，不代表法律结论的置信度。',
   },
   {
     title: 'KG 路仅参与法条融合',
@@ -347,7 +348,7 @@ const finetuneInsight = '从指标与样例可见，微调主要提升了复杂�
 
 const metricRows = [
   { metric: 'Top-1 准确率 (P@1)', before: '46.2%', after: '84.6%', uplift: '+38.4pp' },
-  { metric: 'Top-5 覆盖率 (P@5)', before: '50.0%', after: '100.0%', uplift: '+50.0pp' },
+  { metric: 'Top-5 精确率 (P@5)', before: '50.0%', after: '100.0%', uplift: '+50.0pp' },
   { metric: 'MRR', before: '0.527', after: '0.910', uplift: '+0.383' },
   { metric: 'Hit Rate', before: '84.6%', after: '100.0%', uplift: '+15.4pp' },
 ]
@@ -455,14 +456,14 @@ const kgStats = [
 
 const kgExample = {
   query: '多人持械抢劫并致一人轻伤',
-  matchedEntities: ['抢劫罪', '轻伤'],
-  graphLinks: ['抢劫罪 → 刑法第263条（高频）', '抢劫罪 → 入户/持械/致伤加重情节节点'],
-  output: '优先返回与抢劫罪相关法条，并将加重情节相关条款前置供后续量刑分析。',
+  matchedEntities: ['抢劫罪'],
+  graphLinks: ['抢劫罪 → 刑法第263条', '关系权重来自历史案件共现次数'],
+  output: '根据罪名—法条共现频次返回相关法条；持械、伤情等事实由后续阶段结合案情与法条文本分析。',
 }
 
 const kgBoundaryNotes = [
   '知识图谱检索强调可解释性与稳定规则命中，不替代向量语义召回。',
-  '当 AC 自动机在问句中未命中任何已建罪名实体时，自动降级为前缀模糊匹配作为兜底，尽量返回候选法条。',
+  '当 AC 自动机在问句中未命中任何已建罪名实体时，自动降级为子串模糊匹配作为兜底，尽量返回候选法条。',
   '当查询完全无法匹配时，KG 路返回为空，此时依赖其他检索路补足结果。',
   '图谱关系来源于已标注数据统计，存在语料分布偏差，需要与多路融合共同使用。',
 ]

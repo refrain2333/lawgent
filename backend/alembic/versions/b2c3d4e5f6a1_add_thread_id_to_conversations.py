@@ -22,17 +22,39 @@ def upgrade() -> None:
     # 新增 thread_id 列（先允许 null）
     op.add_column('conversations', sa.Column('thread_id', sa.VARCHAR(255), nullable=True, comment='会话唯一标识'))
 
-    # 把现有 title 值迁移到 thread_id
+    # 兼容旧版本将 thread_id 放在 title 的记录；空标题、重复标题需独立标识。
     conn = op.get_bind()
-    conn.execute(sa.text("UPDATE conversations SET thread_id = title"))
+    # 在 PostgreSQL 内执行回填，也支持 Alembic --sql 生成离线迁移脚本。
+    conn.execute(sa.text("""
+        DO $migration$
+        DECLARE
+            old_conversation RECORD;
+            candidate TEXT;
+        BEGIN
+            FOR old_conversation IN SELECT id, title FROM conversations ORDER BY id LOOP
+                candidate := old_conversation.title;
+                IF candidate IS NULL OR btrim(candidate) = '' OR EXISTS (
+                    SELECT 1 FROM conversations WHERE thread_id = candidate
+                ) THEN
+                    LOOP
+                        candidate := md5(random()::text || clock_timestamp()::text || old_conversation.id::text)::uuid::text;
+                        EXIT WHEN NOT EXISTS (
+                            SELECT 1 FROM conversations WHERE title = candidate OR thread_id = candidate
+                        );
+                    END LOOP;
+                END IF;
+                UPDATE conversations SET thread_id = candidate WHERE id = old_conversation.id;
+            END LOOP;
+        END;
+        $migration$;
+    """))
 
     # 设为非空并加唯一索引
     op.alter_column('conversations', 'thread_id', nullable=False)
     op.create_unique_constraint('uq_conversations_thread_id', 'conversations', ['thread_id'])
     op.create_index('ix_conversations_thread_id', 'conversations', ['thread_id'])
 
-    # 清空 title（留给可读标题）
-    conn.execute(sa.text("UPDATE conversations SET title = NULL"))
+    # 保留旧标题，不因标识迁移丢失可读信息。
 
 
 def downgrade() -> None:

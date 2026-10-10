@@ -2,21 +2,41 @@
 import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from datetime import datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.database import async_session
-from app.models.models import Conversation, ConversationStage, Message, MessageRole, StageConfirmation, StageType
+from app.models.models import (
+    Conversation,
+    ConversationStage,
+    Message,
+    MessageRole,
+    StageConfirmation,
+    StageType,
+    utc_now,
+)
 
 logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def get_session() -> AsyncGenerator[AsyncSession, None]:
-    """获取数据库会话的上下文管理器"""
-    async with async_session() as session:
-        yield session
+async def get_session(db: AsyncSession | None = None) -> AsyncGenerator[AsyncSession, None]:
+    """复用请求事务；写入失败必须向调用方传播，避免错误推进阶段。"""
+    if db is not None:
+        try:
+            yield db
+        except Exception:
+            await db.rollback()
+            raise
+    else:
+        async with async_session() as session:
+            try:
+                yield session
+            except Exception:
+                await session.rollback()
+                raise
 
 
 async def list_conversations(user_id: int, db: AsyncSession) -> list[dict]:
@@ -65,26 +85,15 @@ async def upsert_conversation(
             conv = Conversation(user_id=user_id, thread_id=thread_id, stage=stage_enum)
             session.add(conv)
         else:
+            if conv.user_id != user_id:
+                raise ValueError("会话归属不匹配")
             conv.stage = stage_enum
         await session.commit()
         await session.refresh(conv)
         return conv.id
 
-    if db is not None:
-        try:
-            return await _do_insert(db)
-        except Exception as e:
-            logger.warning(f"会话写库失败: {e}")
-            await db.rollback()
-            return None
-
-    async with async_session() as session:
-        try:
-            return await _do_insert(session)
-        except Exception as e:
-            logger.warning(f"会话写库失败: {e}")
-            await session.rollback()
-            return None
+    async with get_session(db) as session:
+        return await _do_insert(session)
 
 
 async def save_message(
@@ -106,60 +115,31 @@ async def save_message(
     except ValueError:
         stage_enum = ConversationStage.S1_COLLECTING
 
-    async def _do_insert(session: AsyncSession):
+    async with get_session(db) as session:
         session.add(Message(conversation_id=conv_id, role=role_enum, content=content, stage=stage_enum))
+        await session.execute(update(Conversation).where(Conversation.id == conv_id).values(updated_at=utc_now()))
         await session.commit()
-
-    if db is not None:
-        try:
-            await _do_insert(db)
-        except Exception as e:
-            logger.warning(f"消息写库失败: {e}")
-            await db.rollback()
-        return
-
-    async with async_session() as session:
-        try:
-            await _do_insert(session)
-        except Exception as e:
-            logger.warning(f"消息写库失败: {e}")
-            await session.rollback()
 
 
 async def update_stage(
     thread_id: str,
     stage: str,
     db: AsyncSession | None = None,
-    ) -> None:
-    """更新会话阶段"""
-    try:
-        stage_enum = ConversationStage(stage)
-    except ValueError:
-        return
-
-    async def _do_update(session: AsyncSession):
-        result = await session.execute(
-            select(Conversation).where(Conversation.thread_id == thread_id)
-        )
-        conv = result.scalar_one_or_none()
-        if conv:
-            conv.stage = stage_enum
-            await session.commit()
-
-    if db is not None:
-        try:
-            await _do_update(db)
-        except Exception as e:
-            logger.warning(f"阶段更新失败: {e}")
-            await db.rollback()
-        return
-
-    async with async_session() as session:
-        try:
-            await _do_update(session)
-        except Exception as e:
-            logger.warning(f"阶段更新失败: {e}")
-            await session.rollback()
+    *,
+    expected_stage: str | None = None,
+    inactive_before: datetime | None = None,
+) -> bool:
+    """按预期阶段更新，阻止重复确认和过期任务覆盖新状态。"""
+    stage_enum = ConversationStage(stage)
+    async with get_session(db) as session:
+        stmt = update(Conversation).where(Conversation.thread_id == thread_id)
+        if expected_stage is not None:
+            stmt = stmt.where(Conversation.stage == expected_stage)
+        if inactive_before is not None:
+            stmt = stmt.where(func.coalesce(Conversation.updated_at, Conversation.created_at) <= inactive_before)
+        result = await session.execute(stmt.values(stage=stage_enum, updated_at=utc_now()))
+        await session.commit()
+        return result.rowcount == 1
 
 
 async def update_title(thread_id: str, title: str) -> None:
@@ -173,8 +153,8 @@ async def update_title(thread_id: str, title: str) -> None:
             if conv:
                 conv.title = title
                 await session.commit()
-        except Exception as e:
-            logger.warning(f"标题更新失败: {e}")
+        except Exception:
+            logger.warning("标题更新失败")
             await session.rollback()
 
 
@@ -233,10 +213,20 @@ async def save_stage_confirmation(
     input_data: dict,
     output_data: dict,
     db: AsyncSession | None = None,
-    ) -> None:
-    """写入阶段确认记录"""
-
-    async def _do_insert(session: AsyncSession):
+    *,
+    next_stage: str | None = None,
+    expected_stage: str | None = None,
+) -> bool:
+    """将阶段产物与状态在同一事务中保存，失败时一起回滚。"""
+    async with get_session(db) as session:
+        if next_stage is not None:
+            stmt = update(Conversation).where(Conversation.id == conv_id)
+            if expected_stage is not None:
+                stmt = stmt.where(Conversation.stage == expected_stage)
+            result = await session.execute(stmt.values(stage=ConversationStage(next_stage), updated_at=utc_now()))
+            if result.rowcount != 1:
+                await session.rollback()
+                return False
         session.add(StageConfirmation(
             conversation_id=conv_id,
             stage=stage,
@@ -245,18 +235,4 @@ async def save_stage_confirmation(
             is_confirmed=True,
         ))
         await session.commit()
-
-    if db is not None:
-        try:
-            await _do_insert(db)
-        except Exception as e:
-            logger.warning(f"阶段确认写库失败: {e}")
-            await db.rollback()
-        return
-
-    async with async_session() as session:
-        try:
-            await _do_insert(session)
-        except Exception as e:
-            logger.warning(f"阶段确认写库失败: {e}")
-            await session.rollback()
+        return True

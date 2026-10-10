@@ -48,6 +48,7 @@ class DataLoader:
         self.vectors_dir = self._resolve(settings.DATA_VECTORS_PATH, project_root)
         self.criminal_dir = self._resolve(settings.DATA_CRIMINAL_PATH, project_root)
         self.kg_dir = self._resolve(settings.DATA_KG_PATH, project_root)
+        self.cases_json_path = project_root / "data" / "cases" / "legal_cases.json"
 
         # 向量数据
         self.vectors_data: dict[str, Any] = {}
@@ -123,10 +124,29 @@ class DataLoader:
                 continue
             try:
                 with open(fpath, "rb") as f:
-                    self.vectors_data[dtype] = pickle.load(f)
-                count = self.vectors_data[dtype].get("total_count", 0)
+                    data = pickle.load(f)
+                if not isinstance(data, dict):
+                    raise ValueError("向量包必须是字典")
+                vectors = np.asarray(data.get("vectors"))
+                metadata = data.get("metadata")
+                if (
+                    vectors.ndim != 2
+                    or vectors.shape[0] == 0
+                    or vectors.shape[1] != settings.EMBEDDING_DIM
+                    or not np.issubdtype(vectors.dtype, np.number)
+                    or not np.isfinite(vectors).all()
+                    or not isinstance(metadata, list)
+                    or len(metadata) != vectors.shape[0]
+                    or not all(isinstance(meta, dict) for meta in metadata)
+                ):
+                    raise ValueError("向量维度或元数据数量不匹配")
+                data["vectors"] = vectors
+                data["total_count"] = len(metadata)
+                self.vectors_data[dtype] = data
+                count = len(metadata)
                 logger.info(f"加载 {dtype} 向量: {count} 条")
             except Exception as e:
+                self.vectors_data.pop(dtype, None)
                 errors.append(f"加载 {fname} 失败: {e}")
 
         self.vectors_loaded = len(errors) == 0
@@ -141,15 +161,22 @@ class DataLoader:
         if self.original_loaded:
             return {"status": "already_loaded"}
 
+        with self._lock:
+            self.content_cache.clear()
+        self.bm25_built = False
+
         t0 = time.time()
         errors = []
         for dtype, fname in [("articles", "criminal_articles.pkl"),
                               ("cases", "criminal_cases.pkl")]:
             fpath = self.criminal_dir / fname
             if not fpath.exists():
+                self.original_data.pop(dtype, None)
                 errors.append(f"文件不存在: {fpath}")
                 continue
-            self._load_original(dtype)
+            if not self._load_original(dtype):
+                errors.append(f"加载 {fname} 失败，原始数据不可用")
+                continue
             logger.info(f"加载原始数据 {dtype}: {len(self.original_data.get(dtype, []))} 条")
 
         self.original_loaded = len(errors) == 0
@@ -170,10 +197,17 @@ class DataLoader:
 
         # 尝试从缓存加载
         cache_path = self.vectors_dir / "bm25_index.pkl"
+        source_signature = self._bm25_source_signature()
         if cache_path.exists():
             try:
                 with open(cache_path, "rb") as f:
                     cached = pickle.load(f)
+                if cached.get("source_signature") != source_signature:
+                    raise ValueError("BM25 来源数据已变化")
+                if not isinstance(cached.get("index"), BM25Okapi):
+                    raise ValueError("BM25 缓存格式不正确")
+                if cached["index"].corpus_size != len(cached["doc_ids"]):
+                    raise ValueError("BM25 缓存文档数量不匹配")
                 self.bm25_index = cached["index"]
                 self.bm25_doc_ids = cached["doc_ids"]
                 self.bm25_built = True
@@ -242,7 +276,11 @@ class DataLoader:
         # 写入缓存
         try:
             with open(cache_path, "wb") as f:
-                pickle.dump({"index": self.bm25_index, "doc_ids": doc_ids}, f)
+                pickle.dump({
+                    "index": self.bm25_index,
+                    "doc_ids": doc_ids,
+                    "source_signature": source_signature,
+                }, f)
             logger.info(f"BM25 索引已缓存到 {cache_path}")
         except Exception as e:
             logger.warning(f"BM25 缓存写入失败: {e}")
@@ -257,6 +295,23 @@ class DataLoader:
             "cases_count": sum(1 for d in doc_ids if d.startswith("case_")),
             "elapsed": elapsed,
             }
+
+    def _bm25_source_signature(self) -> tuple:
+        """数据或分词规则更新后，旧索引不能继续使用。"""
+        sources = [
+            self.vectors_dir / settings.ARTICLES_VECTORS_FILE,
+            self.vectors_dir / settings.CASES_VECTORS_FILE,
+            self.criminal_dir / "criminal_articles.pkl",
+            self.criminal_dir / "criminal_cases.pkl",
+        ]
+        signature = []
+        for source in sources:
+            try:
+                stat = source.stat()
+                signature.append((str(source), stat.st_size, stat.st_mtime_ns))
+            except OSError:
+                signature.append((str(source), None, None))
+        return (2, self.original_loaded, tuple(signature))
 
     # ------------------------------------------------------------------ #
     # 数据访问
@@ -277,6 +332,10 @@ class DataLoader:
             return 0
         return sum(v.get("total_count", 0) for v in self.vectors_data.values())
 
+    def get_crime_article_map(self) -> dict[str, dict[str, int]]:
+        """返回规范化后的罪名与法条频次映射。"""
+        return self._kg_crime_map if self.kg_loaded else {}
+
     def load_knowledge_graph(self) -> dict[str, Any]:
         """加载知识图谱 pkl"""
         if self.kg_loaded:
@@ -290,12 +349,16 @@ class DataLoader:
         try:
             with open(fpath, "rb") as f:
                 self.knowledge_graph = pickle.load(f)
-            self.kg_loaded = True
             self._build_kg_automaton()
+            self.kg_loaded = True
             elapsed = round(time.time() - t0, 2)
             logger.info(f"知识图谱加载完成，AC自动机罪名数={len(self._kg_crime_map)}，耗时 {elapsed}s")
             return {"status": "success", "elapsed": elapsed, "crime_count": len(self._kg_crime_map)}
         except Exception as e:
+            self.kg_loaded = False
+            self.knowledge_graph = None
+            self.kg_automaton = None
+            self._kg_crime_map = {}
             logger.error(f"知识图谱加载失败: {e}")
             return {"status": "error", "error": str(e)}
 
@@ -306,8 +369,7 @@ class DataLoader:
             kg.get("crime_article_mapping", {}) if isinstance(kg, dict) else {}
         )
         if not crime_article_map:
-            logger.warning("知识图谱中未找到罪名映射字段")
-            return
+            raise ValueError("知识图谱中未找到罪名映射字段")
 
         # 规范化为 {crime: {art_num_str: count}}
         normalized: dict[str, dict[str, int]] = {}
@@ -315,12 +377,22 @@ class DataLoader:
             art_map: dict[str, int] = {}
             if isinstance(articles, dict):
                 for art_num, cnt in articles.items():
-                    art_map[str(art_num)] = int(cnt) if isinstance(cnt, (int, float)) else 1
+                    count = int(cnt) if isinstance(cnt, (int, float)) else 1
+                    if count > 0:
+                        art_map[str(art_num)] = count
             elif isinstance(articles, list):
                 for art_num in articles:
                     art_map[str(art_num)] = art_map.get(str(art_num), 0) + 1
             if art_map:
-                normalized[str(crime)] = art_map
+                name = str(crime).strip().removesuffix("罪")
+                if not name:
+                    continue
+                existing = normalized.setdefault(name, {})
+                for art_num, count in art_map.items():
+                    existing[art_num] = existing.get(art_num, 0) + count
+
+        if not normalized:
+            raise ValueError("知识图谱中没有有效的罪名关系")
 
         self._kg_crime_map = normalized
 
@@ -328,22 +400,23 @@ class DataLoader:
         automaton = ahocorasick.Automaton()
         for crime in normalized:
             automaton.add_word(crime, crime)
-            # 也加入去掉"罪"后缀的形式，提升召回
-            if crime.endswith("罪") and len(crime) > 1:
-                stem = crime[:-1]
-                automaton.add_word(stem, crime)  # value 仍指向原罪名
+            automaton.add_word(f"{crime}罪", crime)
         automaton.make_automaton()
         self.kg_automaton = automaton
 
     def kg_search(self, query: str, top_k: int = 10) -> list[tuple[str, float]]:
         """知识图谱搜索：AC自动机识别罪名 → 聚合法条频次 → 归一化评分，返回 [(法条编号, 归一化分)] 列表。
         AC 无命中时降级为前缀模糊匹配。"""
-        if not self.kg_loaded or self.kg_automaton is None:
+        if not query.strip() or top_k <= 0 or not self.kg_loaded or self.kg_automaton is None:
             return []
 
         # AC 自动机多模式匹配，O(|query|)
         matched_articles: dict[str, int] = {}
+        matched_crimes: set[str] = set()
         for _, crime in self.kg_automaton.iter(query):
+            if crime in matched_crimes:
+                continue
+            matched_crimes.add(crime)
             for art_num, count in self._kg_crime_map.get(crime, {}).items():
                 matched_articles[art_num] = matched_articles.get(art_num, 0) + count
 
@@ -418,17 +491,21 @@ class DataLoader:
 
             return content
 
-    def _load_original(self, dtype: str):
+    def _load_original(self, dtype: str) -> bool:
         fname = "criminal_articles.pkl" if dtype == "articles" else "criminal_cases.pkl"
         data = safe_load_pickle(self.criminal_dir / fname)
-        self.original_data[dtype] = data if data is not None else []
+        if not isinstance(data, (list, tuple)):
+            self.original_data.pop(dtype, None)
+            return False
+        self.original_data[dtype] = data
+        return True
 
     def load_cases_json_index(self) -> None:
         """加载 legal_cases.json 构建 {case_id: extra_fields} 索引"""
         if self._cases_json_loaded:
             return
         import json
-        p = self.criminal_dir.parent / "cases" / "legal_cases.json"
+        p = self.cases_json_path
         if not p.exists():
             logger.warning(f"legal_cases.json 不存在: {p}")
             return
@@ -448,7 +525,7 @@ class DataLoader:
                         "death_penalty": bool(toi.get("death_penalty", False)),
                         "life_imprisonment": bool(toi.get("life_imprisonment", False)),
                         "imprisonment_months": toi.get("imprisonment"),
-                        "fine_amount": meta.get("punish_of_money") or None,
+                        "fine_amount": meta.get("punish_of_money"),
                     }
                 except Exception:
                     continue

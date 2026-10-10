@@ -25,11 +25,15 @@ def load_prompt(name: str, with_base: bool = True) -> str:
 
 def parse_json(raw: str) -> dict:
     """解析 LLM 输出的 JSON 对象，兼容 markdown 代码块包裹的情况"""
+    if not isinstance(raw, str):
+        return {}
+    fenced = re.fullmatch(r"\s*```(?:json)?\s*(.*?)\s*```\s*", raw, re.DOTALL | re.IGNORECASE)
+    if fenced:
+        raw = fenced.group(1)
     try:
         result = json.loads(raw)
-        if isinstance(result, dict):
-            return result
-    except Exception:
+        return result if isinstance(result, dict) else {}
+    except (json.JSONDecodeError, TypeError):
         pass
 
     m = re.search(r'\{.*\}', raw, re.DOTALL)
@@ -38,9 +42,19 @@ def parse_json(raw: str) -> dict:
             result = json.loads(m.group())
             if isinstance(result, dict):
                 return result
-        except Exception:
+        except json.JSONDecodeError:
             pass
     return {}
+
+
+def format_sentence(case: dict) -> str:
+    """保留无期和死刑标志，不能将其零月数解释为有期徒刑。"""
+    if case.get("death_penalty"):
+        return "死刑"
+    if case.get("life_imprisonment"):
+        return "无期徒刑"
+    months = case.get("sentence_months")
+    return f"有期徒刑{months}个月" if months is not None else "未知"
 
 
 async def llm_stream(
