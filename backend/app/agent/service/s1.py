@@ -1,13 +1,12 @@
 # S1 案情收集
 import json
-import re
 from collections.abc import AsyncGenerator
 
 from langchain_core.messages import AIMessage, AIMessageChunk, HumanMessage, SystemMessage
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
-from app.agent.service.utils import llm_stream, load_prompt
+from app.agent.service.utils import llm_stream, load_prompt, parse_json
 from app.core.logger import log_ai_call
 from app.infrastructure.llm_client import get_chat_model
 
@@ -101,15 +100,11 @@ async def check_sufficient(history: list[dict], thread_id: str = "") -> dict:
     raw = response.content.strip()
     log_ai_call(stage="s1_check_sufficient", thread_id=thread_id, input_messages=messages, output=raw)
 
-    try:
-        return json.loads(raw)
-    except Exception:
-        m = re.search(r'\{.*\}', raw, re.DOTALL)
-        if m:
-            try:
-                return json.loads(m.group())
-            except Exception:
-                pass
+    result = parse_json(raw)
+    if isinstance(result.get("sufficient"), bool):
+        summary = result.get("summary")
+        if not result["sufficient"] or (isinstance(summary, str) and summary.strip()):
+            return result
     return {"sufficient": False, "reason": "判断失败，请继续补充案情", "summary": ""}
 
 

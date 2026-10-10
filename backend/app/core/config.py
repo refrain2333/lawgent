@@ -8,6 +8,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 _ENV_FILE = Path(__file__).parent.parent.parent / ".env"
 
 _DEFAULT_JWT_SECRET = "lawgent-secret-key-change-in-production"
+_INSECURE_JWT_SECRETS = {_DEFAULT_JWT_SECRET, "change-me-to-a-random-secret"}
 
 
 class Settings(BaseSettings):
@@ -47,10 +48,12 @@ class Settings(BaseSettings):
     HF_HOME: str = ""
     EMBEDDING_DIM: int = 768
     CACHE_SIZE_LIMIT: int = 1000
+    LOG_AI_CONTENT: bool = False
 
     @model_validator(mode="after")
     def _check_secret(self) -> "Settings":
-        if not self.DEBUG and self.JWT_SECRET == _DEFAULT_JWT_SECRET:
+        jwt_secret = self.JWT_SECRET.strip()
+        if not self.DEBUG and (not jwt_secret or jwt_secret in _INSECURE_JWT_SECRETS):
             raise ValueError(
                 "检测到生产模式仍在使用默认 JWT_SECRET，请在 .env 中设置一个随机密钥。"
             )

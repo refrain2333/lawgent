@@ -23,7 +23,7 @@ router = APIRouter(tags=["Agent"])
 
 
 async def _get_conv(thread_id: str, user_id: int, db: AsyncSession) -> Conversation:
-    """获取会话，不存在则创建"""
+    """获取当前用户的会话；未知或他人会话统一返回 404。"""
     result = await db.execute(
         select(Conversation).where(
             Conversation.user_id == user_id,
@@ -32,10 +32,7 @@ async def _get_conv(thread_id: str, user_id: int, db: AsyncSession) -> Conversat
     )
     conv = result.scalar_one_or_none()
     if conv is None:
-        conv = Conversation(user_id=user_id, thread_id=thread_id, stage=ConversationStage.S1_COLLECTING)
-        db.add(conv)
-        await db.commit()
-        await db.refresh(conv)
+        raise HTTPException(status_code=404, detail="会话不存在")
     return conv
 
 
@@ -86,7 +83,10 @@ async def create_session(
     ):
     """创建新会话，返回 thread_id"""
     thread_id = str(uuid.uuid4())
-    conv = await _get_conv(thread_id, user_id, db)
+    conv = Conversation(user_id=user_id, thread_id=thread_id, stage=ConversationStage.S1_COLLECTING)
+    db.add(conv)
+    await db.commit()
+    await db.refresh(conv)
     logger.info(f"新会话创建: thread={thread_id} user={user_id}")
     return {"thread_id": thread_id, "stage": conv.stage}
 
@@ -359,7 +359,7 @@ async def _gen_and_save_title(thread_id: str, summary: str) -> None:
     try:
         title = await generate_title(summary)
         await conversation_service.update_title(thread_id, title)
-        logger.info(f"会话标题已生成: {title}")
+        logger.info(f"会话标题已生成: thread={thread_id}")
     except Exception as e:
         logger.warning(f"标题生成失败: {e}")
 

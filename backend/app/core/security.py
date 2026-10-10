@@ -1,4 +1,6 @@
 # 安全工具
+import base64
+import hashlib
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -7,18 +9,39 @@ from jose import jwt
 
 from app.core.config import settings
 
+_PASSWORD_HASH_PREFIX = "bcrypt-sha256$"
+
+
+def _bcrypt_input(password: str) -> bytes:
+    """预哈希后编码，避免 bcrypt 的 72 字节输入上限。"""
+    return base64.b64encode(hashlib.sha256(password.encode("utf-8")).digest())
+
+
+def _legacy_bcrypt_input(password: str) -> bytes:
+    """旧版哈希曾直接截断至 72 字节，登录时保留兼容。"""
+    return password.encode("utf-8")[:72]
+
+
+def needs_password_rehash(hashed_password: str) -> bool:
+    """判断是否仍使用旧版 bcrypt 哈希格式。"""
+    return not hashed_password.startswith(_PASSWORD_HASH_PREFIX)
+
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """验证密码"""
-    return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
+    """验证新格式及旧版 bcrypt 密码哈希。"""
+    is_current = hashed_password.startswith(_PASSWORD_HASH_PREFIX)
+    encoded_hash = hashed_password[len(_PASSWORD_HASH_PREFIX):] if is_current else hashed_password
+    password_bytes = _bcrypt_input(plain_password) if is_current else _legacy_bcrypt_input(plain_password)
+    try:
+        return bcrypt.checkpw(password_bytes, encoded_hash.encode("utf-8"))
+    except (TypeError, ValueError):
+        return False
 
 
 def hash_password(password: str) -> str:
-    """生成密码哈希（bcrypt 限制 72 字节，超出截断）"""
-    encoded = password.encode("utf-8")
-    if len(encoded) > 72:
-        encoded = encoded[:72]
-    return bcrypt.hashpw(encoded, bcrypt.gensalt(rounds=10)).decode("utf-8")
+    """使用 SHA-256 + Base64 预处理后再生成 bcrypt 哈希。"""
+    hashed = bcrypt.hashpw(_bcrypt_input(password), bcrypt.gensalt(rounds=10)).decode("utf-8")
+    return f"{_PASSWORD_HASH_PREFIX}{hashed}"
 
 
 def create_access_token(data: dict[str, Any]) -> str:

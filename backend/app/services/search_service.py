@@ -177,7 +177,7 @@ async def vector_search_async(query: str, articles_count: int = 5, cases_count: 
     cases = [r for r in (_build_case(d, s, case_meta) for d, s in case_raw) if r]
 
     elapsed = round((time.time() - t0) * 1000, 2)
-    logger.info(f"向量检索完成: '{query}' -> {len(articles)} 法条, {len(cases)} 案例, {elapsed}ms")
+    logger.info(f"向量检索完成: query_len={len(query)} -> {len(articles)} 法条, {len(cases)} 案例, {elapsed}ms")
 
     return SearchResponse(
         query=query,
@@ -246,7 +246,7 @@ async def bm25_search_async(query: str, articles_count: int = 5, cases_count: in
     cases = [r for r in (_build_case(d, s, case_meta) for d, s in case_raw) if r]
 
     elapsed = round((time.time() - t0) * 1000, 2)
-    logger.info(f"BM25检索完成: '{query}' -> {len(articles)} 法条, {len(cases)} 案例, {elapsed}ms")
+    logger.info(f"BM25检索完成: query_len={len(query)} -> {len(articles)} 法条, {len(cases)} 案例, {elapsed}ms")
 
     return SearchResponse(
         query=query,
@@ -343,7 +343,7 @@ async def search_async(
 
     active = sum(bool(t) for t in [vector, bm25, kg, query2doc, hyde])
     elapsed = round((time.time() - t0) * 1000, 2)
-    logger.info(f"融合检索({active}路)完成: '{main_query[:20]}' -> {len(articles)} 法条, {len(cases)} 案例, {elapsed}ms")
+    logger.info(f"融合检索({active}路)完成: query_len={len(main_query)} -> {len(articles)} 法条, {len(cases)} 案例, {elapsed}ms")
 
     return SearchResponse(
         query=main_query,

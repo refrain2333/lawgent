@@ -7,6 +7,8 @@ from pathlib import Path
 
 from loguru import logger
 
+from app.core.config import settings
+
 # 基础日志目录 (backend/logs)
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 BASE_LOG_DIR = BASE_DIR / "logs"
@@ -97,9 +99,13 @@ def log_ai_call(
         "ts": now.isoformat(),
         "stage": stage,
         "thread_id": thread_id,
-        "input": [_serialize_msg(m) for m in input_messages],
-        "output": output,
     }
+    if settings.LOG_AI_CONTENT:
+        record["input"] = [_serialize_msg(m) for m in input_messages]
+        record["output"] = output
+    else:
+        record["input_count"] = len(input_messages)
+        record["output_chars"] = len(output)
     if extra:
         record.update(extra)
 

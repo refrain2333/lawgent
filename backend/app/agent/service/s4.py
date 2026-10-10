@@ -86,5 +86,5 @@ async def gen_report(
 
     result = parse_json(raw)
     if not result:
-        logger.warning(f"S4报告解析失败: {raw[:100]}")
+        logger.warning("S4 报告输出不是有效 JSON 对象")
     return result

@@ -24,16 +24,22 @@ def load_prompt(name: str, with_base: bool = True) -> str:
 
 
 def parse_json(raw: str) -> dict:
-    """解析 LLM 输出的 JSON，兼容 markdown 代码块包裹的情况"""
+    """解析 LLM 输出的 JSON 对象，兼容 markdown 代码块包裹的情况"""
     try:
-        return json.loads(raw)
+        result = json.loads(raw)
+        if isinstance(result, dict):
+            return result
     except Exception:
-        m = re.search(r'\{.*\}', raw, re.DOTALL)
-        if m:
-            try:
-                return json.loads(m.group())
-            except Exception:
-                pass
+        pass
+
+    m = re.search(r'\{.*\}', raw, re.DOTALL)
+    if m:
+        try:
+            result = json.loads(m.group())
+            if isinstance(result, dict):
+                return result
+        except Exception:
+            pass
     return {}
 
 

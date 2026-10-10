@@ -235,6 +235,49 @@ class TestConversations:
         assert response.status_code == 200
         assert response.json() == []
 
+    async def test_missing_thread_messages_returns_404_without_creating_it(
+        self, client: AsyncClient, token: str, db_session: AsyncSession
+    ):
+        thread_id = "missing-thread"
+        response = await client.get(
+            f"/api/v1/agent/conversations/{thread_id}/messages",
+            headers=_auth(token),
+        )
+        assert response.status_code == 404
+
+        result = await db_session.execute(
+            select(Conversation).where(Conversation.thread_id == thread_id)
+        )
+        assert result.scalar_one_or_none() is None
+
+    async def test_other_users_thread_messages_are_hidden(
+        self, client: AsyncClient, token: str, db_session: AsyncSession
+    ):
+        other = User(email="other-thread@example.com", password=hash_password("password123"))
+        db_session.add(other)
+        await db_session.commit()
+        await db_session.refresh(other)
+        db_session.add(
+            Conversation(
+                user_id=other.id,
+                thread_id="other-users-thread",
+                stage=ConversationStage.S1_COLLECTING,
+            )
+        )
+        await db_session.commit()
+
+        response = await client.get(
+            "/api/v1/agent/conversations/other-users-thread/messages",
+            headers=_auth(token),
+        )
+        assert response.status_code == 404
+
+        result = await db_session.execute(
+            select(Conversation).where(Conversation.thread_id == "other-users-thread")
+        )
+        conversation = result.scalar_one()
+        assert conversation.user_id == other.id
+
     async def test_delete_conversation(self, client: AsyncClient, token: str):
         create = await client.post("/api/v1/agent/sessions", json={}, headers=_auth(token))
         thread_id = create.json()["thread_id"]

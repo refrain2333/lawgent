@@ -1,4 +1,5 @@
 # 用户接口测试
+import bcrypt
 import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -95,6 +96,38 @@ class TestLogin:
         data = response.json()
         assert "access_token" in data
         assert data["token_type"] == "bearer"
+
+    async def test_login_with_password_over_bcrypt_limit(self, client: AsyncClient):
+        password = "汉" * 25  # 75 UTF-8 bytes; bcrypt accepts at most 72.
+        register = await client.post(
+            "/api/v1/user/register",
+            json={"email": "long-password@example.com", "password": password},
+        )
+        assert register.status_code == 200
+
+        login = await client.post(
+            "/api/v1/user/login",
+            json={"email": "long-password@example.com", "password": password},
+        )
+        assert login.status_code == 200
+
+    async def test_login_upgrades_legacy_password_hash(self, client: AsyncClient, db_session: AsyncSession):
+        password = "汉" * 25
+        user = User(
+            email="legacy-password@example.com",
+            password=bcrypt.hashpw(password.encode("utf-8")[:72], bcrypt.gensalt(rounds=4)).decode("utf-8"),
+        )
+        db_session.add(user)
+        await db_session.commit()
+
+        response = await client.post(
+            "/api/v1/user/login",
+            json={"email": user.email, "password": password},
+        )
+        assert response.status_code == 200
+
+        await db_session.refresh(user)
+        assert user.password.startswith("bcrypt-sha256$")
 
     async def test_login_wrong_password(self, client: AsyncClient, test_user: User):
         """密码错误"""

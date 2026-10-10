@@ -122,6 +122,8 @@ npm run dev
 `DATABASE_URL`、`DATA_VECTORS_PATH`、`DATA_CRIMINAL_PATH`、`DATA_KG_PATH`、
 `LOCAL_MODEL_PATH`、`FINETUNED_MODEL_PATH`、`MODEL_OFFLINE_MODE`、`HF_HOME`、`LLM_API_KEY`。
 
+AI 输入和回复正文默认不写入日志。只有在受控调试时才将 `LOG_AI_CONTENT=True`；开启后，日志可能包含个人案件信息，应限制访问并及时清理。
+
 > 请勿把填好真实密钥的 `.env` 提交到仓库。
 
 ## API 概览

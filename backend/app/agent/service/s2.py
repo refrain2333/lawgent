@@ -34,7 +34,7 @@ async def _gen_queries(summary: str, thread_id: str = "") -> dict:
     log_ai_call(stage="s2_gen_queries", thread_id=thread_id, input_messages=messages, output=raw)
     result = parse_json(raw)
     if not result:
-        logger.warning(f"S2 检索词解析失败: {raw[:100]}")
+        logger.warning("S2 检索词解析失败，使用案情摘要回退")
     return result
 
 
@@ -62,14 +62,14 @@ async def gen_checklist(summary: str, search_result: dict, thread_id: str = "") 
     log_ai_call(stage="s2_checklist", thread_id=thread_id, input_messages=messages, output=raw)
     result = parse_json(raw)
     if not result:
-        logger.warning(f"清单解析失败: {raw[:100]}")
+        logger.warning("清单输出不是有效 JSON 对象")
     return result
 
 
 async def run_s2(summary: str, thread_id: str = "", count: int = 5) -> dict:
     """执行S2检索，返回检索结果dict"""
     queries = await _gen_queries(summary, thread_id)
-    logger.info(f"S2 检索词: {queries}")
+    logger.info(f"S2 检索词生成完成: thread={thread_id}")
 
     result = await search_async(
         vector=queries.get("vector", summary),
