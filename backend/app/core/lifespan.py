@@ -36,7 +36,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Lawformer 预热失败，向量检索不可用: {e}")
 
-    logger.info(f"启动完成，文档: http://{settings.HOST}:{settings.PORT}/docs")
+    logger.info(f"启动完成，接口文档（Scalar）: http://{settings.HOST}:{settings.PORT}/docs")
 
     yield
 
