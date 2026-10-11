@@ -298,7 +298,7 @@ class TestConversations:
 
         from app.services import conversation_service
         await conversation_service.upsert_conversation(
-            other.id, "other-thread", ConversationStage.S1_COLLECTING
+            other.id, "other-thread", ConversationStage.S1_COLLECTING, db=db_session
         )
 
         response = await client.get("/api/v1/agent/conversations", headers=_auth(token))

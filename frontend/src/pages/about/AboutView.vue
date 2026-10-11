@@ -80,14 +80,14 @@ const dataSources = [
   {
     name: 'CAIL2018',
     label: '案例数据',
-    desc: '17,547 条刑事裁判文书，含案件事实、罪名标注与适用法条，由清华大学 NLP 实验室发布。',
+    desc: '17,131 条刑事裁判文书，含案件事实、罪名标注与适用法条，由清华大学 NLP 实验室发布。',
     url: 'https://github.com/thunlp/CAIL',
     color: 'text-primary bg-primary/10 border-primary/30',
   },
   {
     name: 'LawRefBook/Laws',
     label: '法条数据',
-    desc: '446 条刑法条文，结构化法条文本，包含条文号、标题与内容，来源于开源法律数据库。',
+    desc: '416 条刑法条文，结构化法条文本，包含条文号、标题与内容，来源于开源法律数据库。',
     url: 'https://github.com/LawRefBook/Laws',
     color: 'text-emerald-600 dark:text-emerald-300 bg-emerald-500/10 border-emerald-200 dark:border-emerald-800',
   },
@@ -158,7 +158,7 @@ const techEntries = [
                 现有 LLM 直接回答法律问题存在幻觉风险，缺乏真实案例与法条支撑。
               </p>
               <p>
-                LawGent 以 CAIL2018 刑事裁判文书数据集为基础，构建了覆盖 17,547 条案例的检索库，
+                LawGent 以 CAIL2018 刑事裁判文书数据集为基础，构建了覆盖 17,131 条案例的检索库，
                 结合微调后的 Lawformer 向量模型与罪名-法条知识图谱，通过 LangChain Agent 驱动多轮对话，
                 最终输出有据可查的风险评估报告。
               </p>
@@ -199,7 +199,7 @@ const techEntries = [
                 包含真实刑事裁判文书，每条记录含案件事实、罪名标注与适用法条。
               </p>
               <p>
-                经清洗与向量化后，系统共索引 <span class="font-semibold text-foreground">17,547 条</span>案例文档，
+                经清洗与向量化后，系统共索引 <span class="font-semibold text-foreground">17,131 条</span>案例文档，
                 并从中抽取罪名-法条共现关系构建知识图谱。
                 Lawformer 微调同样基于此数据集，采用三元组对比学习提升刑事语境下的语义匹配能力。
               </p>

@@ -155,7 +155,7 @@ const infoExpanded = ref(false)
             </div>
             <div class="text-xs text-muted-foreground">
               推荐输入：<span class="font-mono text-foreground cursor-pointer hover:text-primary transition-colors"
-                @click="query = methodInfo[activeTab].example.split(' / ')[0]; doSearch()">{{ methodInfo[activeTab].example }}</span>
+                @click="query = methodInfo[activeTab].example.split(' / ')[0] ?? ''; doSearch()">{{ methodInfo[activeTab].example }}</span>
             </div>
           </div>
         </div>

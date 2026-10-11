@@ -8,6 +8,8 @@ from app.db.data_loader import get_data_loader
 def loader():
     dl = get_data_loader()
     dl.load_all()
+    if not dl.vectors_loaded:
+        pytest.skip("本地缺少处理后的数据文件（data/processed/），跳过数据加载测试。")
     return dl
 
 

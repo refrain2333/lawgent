@@ -344,7 +344,7 @@ const finetuneExample = {
   note: '微调后，模型更容易将“暴力 + 非法占有”联合语义映射到抢劫罪及其加重情节。',
 }
 
-const finetuneInsight = '从指标与样例可见，微调主要提升了复杂案情下的“正确法条前排率”，尤其对多要素联合语义更稳定。'
+const finetuneInsight = '从指标与样例可见，微调主要提升了复杂案情下的“正确法条前排率”，尤其对多要素联合语义更稳定。（以上指标来自 13 条构造查询的小规模评估，用于观察趋势，样本量有限；更大规模的结论需用 CAIL 留出集验证。）'
 
 const metricRows = [
   { metric: 'Top-1 准确率 (P@1)', before: '46.2%', after: '84.6%', uplift: '+38.4pp' },

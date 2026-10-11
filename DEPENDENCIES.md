@@ -12,13 +12,13 @@
 
 | 文件 | 默认路径 | 来源 | 说明 |
 | --- | --- | --- | --- |
-| `criminal_articles.pkl` | `data/processed/criminal/` | [LawRefBook/Laws](https://github.com/LawRefBook/Laws) | 结构化刑法条文（条文号、标题、内容），约 446 条。 |
+| `criminal_articles.pkl` | `data/processed/criminal/` | [LawRefBook/Laws](https://github.com/LawRefBook/Laws) | 结构化刑法条文（条文号、标题、内容），约 416 条。 |
 | `criminal_cases.pkl` | `data/processed/criminal/` | [CAIL2018](https://github.com/thunlp/CAIL) | 刑事案例（案件事实、罪名、适用法条），约 1.7 万条。 |
 | `criminal_articles_vectors_finetuned.pkl` | `data/processed/vectors/` | 由上面的法条数据向量化得到 | 768 维法条向量及元数据。 |
 | `criminal_cases_vectors_finetuned.pkl` | `data/processed/vectors/` | 由上面的案例数据向量化得到 | 768 维案例向量及元数据。 |
 | `knowledge_graph.pkl` | `data/processed/knowledge_graph/` | 由案例中的罪名-法条共现关系构建 | 罪名与法条的关联图谱。 |
 
-数据记录规模示例：法条约 446 条、案例约 17,131 条。字段结构可参考 `research/cloud_training_suite/` 下的说明与示例脚本。
+数据记录规模示例：法条约 416 条、案例约 17,131 条。字段结构可参考 `research/cloud_training_suite/` 下的说明与示例脚本。
 
 > 处理流程（原始文本 → 结构化 → 向量化 → 图谱）见 `research/cloud_training_suite/data_pipeline/`。
 

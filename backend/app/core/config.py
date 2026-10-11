@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     PORT: int = 5006
 
     # 数据库配置
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/lawgent"
+    DATABASE_URL: str = "postgresql+asyncpg://LawGent:LawGent@localhost:54321/lawgent"
 
     # JWT 配置
     JWT_SECRET: str = _DEFAULT_JWT_SECRET
@@ -32,9 +32,9 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173"
 
     # 数据路径配置
-    DATA_VECTORS_PATH: str = "data/vectors"
-    DATA_CRIMINAL_PATH: str = "data/criminal"
-    DATA_KG_PATH: str = "data/knowledge_graph"
+    DATA_VECTORS_PATH: str = "data/processed/vectors"
+    DATA_CRIMINAL_PATH: str = "data/processed/criminal"
+    DATA_KG_PATH: str = "data/processed/knowledge_graph"
     ARTICLES_VECTORS_FILE: str = "criminal_articles_vectors_finetuned.pkl"
     CASES_VECTORS_FILE: str = "criminal_cases_vectors_finetuned.pkl"
 

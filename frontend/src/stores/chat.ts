@@ -224,7 +224,7 @@ export const useChatStore = defineStore('chat', () => {
       _startTypewriter(streamingMsgId)
     } else if (type === 'stage_changed' && typeof data.stage === 'string' && STAGE_MAP[data.stage]) {
       dbStage.value = data.stage
-      stage.value = STAGE_MAP[data.stage]
+      stage.value = STAGE_MAP[data.stage] ?? stage.value
       confirmRequest.value = null
     } else if (type === 'case_ready' && typeof data.summary === 'string') {
       _finishStreaming()

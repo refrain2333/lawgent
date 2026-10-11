@@ -173,7 +173,8 @@ function renderGlobalGraph(data: { nodes: GraphNode[]; edges: GraphEdge[] }) {
       value: n.weight,
       label: {
         show: isCrime,
-        position: 'outside' as const,
+        // echarts 6 的 label.position 类型定义未包含 'outside'，运行时有效，此处断言绕过
+        position: 'outside' as never,
         fontSize: 10,
         color: '#e2e8f0',
         textBorderColor: '#1b1f2e',
@@ -364,7 +365,7 @@ function renderGraph(data: RelationsData) {
       y: ny,
       label: {
         show: true,
-        position: isCenter ? 'inside' as const : 'outside' as const,
+        position: (isCenter ? 'inside' : 'outside') as never,
         fontSize: isCenter ? 13 : 10,
         fontWeight: isCenter ? 'bold' as const : 'normal' as const,
         color: isCenter ? '#ffffff' : '#e2e8f0',

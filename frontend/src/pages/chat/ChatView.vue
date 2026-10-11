@@ -184,16 +184,6 @@ async function openConversation(threadId: string) {
   if (await chatStore.connect(threadId)) await chatStore.fetchMessages(threadId)
 }
 
-function stageLabel(stage: string) {
-  const map: Record<string, string> = {
-    s1_collecting: '案情收集', s1_confirming: '案情确认',
-    s2_searching: '检索分析', s2_failed: '检索失败',
-    s3_collecting: '情节补充', s3_confirming: '情节确认',
-    s4_generating: '报告生成中', s4_done: '报告完成', s4_failed: '报告失败',
-  }
-  return map[stage] ?? stage
-}
-
 function formatAsTitle(iso: string | null) {
   if (!iso) return '新咨询'
   const d = new Date(iso)
@@ -547,7 +537,7 @@ const steps = [
 
             <template v-for="(s, idx) in stages" :key="s.id">
               <div
-                @click="!chatStore.isThinking && !isEnteringS3 && (s.id === 'S3' ? goToS3() : (chatStore.viewStage = stages[idx].id))"
+                @click="!chatStore.isThinking && !isEnteringS3 && (s.id === 'S3' ? goToS3() : (chatStore.viewStage = s.id))"
                 class="flex items-center gap-1.5 transition-all group relative px-2 py-1 rounded-md"
                 :class="[
                   chatStore.stageIndex >= idx ? 'text-primary' : 'text-muted-foreground/40',

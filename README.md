@@ -99,7 +99,7 @@ Query2Doc 和 HyDE 的生成文本用于构造查询；报告引用的证据来�
 
 | 层 | 技术 |
 | --- | --- |
-| 后端 | FastAPI、SQLModel / SQLAlchemy / Alembic、PostgreSQL（pgvector）、LangChain、Transformers（Lawformer） |
+| 后端 | FastAPI、SQLModel / SQLAlchemy / Alembic、PostgreSQL、LangChain、Transformers（Lawformer） |
 | 前端 | Vue 3、TypeScript、Vite、Pinia、Tailwind |
 | 基础设施 | PostgreSQL（Docker）、本地向量/图谱数据、本地模型权重 |
 
@@ -136,7 +136,7 @@ LawGent/
 
 ## 快速开始
 
-### 1. 启动数据库（PostgreSQL + pgvector）
+### 1. 启动数据库（PostgreSQL）
 
 ```bash
 cd research/lawgent-db
@@ -250,6 +250,12 @@ uv run pytest
 ## 免责声明
 
 本项目输出内容仅供学习、研究与辅助参考，不构成正式法律意见。实际案件请咨询执业律师并结合完整证据材料判断。
+
+使用前请另外注意三点：
+
+- **法律时效**：检索库基于 CAIL2018 数据集，判决均在 2018 年及以前。此后刑法又经过修正案（十一）（十二）等修订，涉及的法条与量刑参考可能已经过时，不应作为现行法律的依据。
+- **数据与隐私**：用户输入的案情会发送给所配置的第三方 LLM 服务，并可能写入本地 AI 日志。AI 日志内容记录默认关闭（`LOG_AI_CONTENT=False`），如需开启请先确认合规要求与数据保留期限。
+- **输出范围**：系统在 S4 阶段会给出刑期预估、缓刑可能性等量刑参考，属于基于历史案例统计的辅助判断，不代表真实判决结果。
 
 
 
