@@ -104,14 +104,29 @@ class TestAuth:
         )
         assert response.status_code == 401
 
-    async def test_token_via_query_still_supported(self, client: AsyncClient, token: str):
-        """SSE 场景下仍支持 query 参数传 token"""
+    async def test_query_token_rejected(self, client: AsyncClient, token: str):
+        """不再接受 query 参数传 token，避免凭据进入访问日志"""
         response = await client.get(f"/api/v1/agent/conversations?token={token}")
-        assert response.status_code == 200
+        assert response.status_code == 401
 
     async def test_hardcoded_debug_token_rejected(self, client: AsyncClient):
         """历史调试 token 不应再被接受"""
         response = await client.get("/api/v1/agent/conversations?token=admin")
+        assert response.status_code == 401
+
+    async def test_header_token_accepted(self, client: AsyncClient, token: str):
+        """标准 Authorization header 鉴权正常"""
+        response = await client.get("/api/v1/agent/conversations", headers=_auth(token))
+        assert response.status_code == 200
+
+    async def test_token_without_exp_rejected(self, client: AsyncClient, test_user):
+        """不带 exp 的 Token 必须被拒绝（防止永不过期的凭据）"""
+        from jose import jwt
+
+        from app.core.config import settings
+
+        no_exp = jwt.encode({"user_id": test_user.id}, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
+        response = await client.get("/api/v1/agent/conversations", headers=_auth(no_exp))
         assert response.status_code == 401
 
 
@@ -304,4 +319,43 @@ class TestConversations:
         response = await client.get("/api/v1/agent/conversations", headers=_auth(token))
         thread_ids = [c["thread_id"] for c in response.json()]
         assert "other-thread" not in thread_ids
+
+
+
+# ------------------------------------------------------------------ #
+# 六、限流
+# ------------------------------------------------------------------ #
+
+class TestRateLimit:
+
+    async def test_create_session_rate_limited(self, client: AsyncClient, token: str):
+        """短时间内创建过多会话应被限流（默认 10 次/分钟）"""
+        from app.core.rate_limit import reset_rate_limits
+
+        reset_rate_limits()
+        statuses = []
+        for _ in range(11):
+            resp = await client.post("/api/v1/agent/sessions", json={}, headers=_auth(token))
+            statuses.append(resp.status_code)
+        assert statuses[:10] == [200] * 10
+        assert statuses[10] == 429
+
+    async def test_message_rate_limited(self, client: AsyncClient, token: str):
+        """短时间内发送过多消息应被限流（默认 20 次/分钟）"""
+        from app.core.rate_limit import reset_rate_limits
+
+        reset_rate_limits()
+        create = await client.post("/api/v1/agent/sessions", json={}, headers=_auth(token))
+        thread_id = create.json()["thread_id"]
+
+        statuses = []
+        for _ in range(21):
+            resp = await client.post(
+                f"/api/v1/agent/sessions/{thread_id}/message",
+                json={"content": "测试"},
+                headers=_auth(token),
+            )
+            statuses.append(resp.status_code)
+        assert statuses.count(429) >= 1
+        assert statuses[20] == 429
 

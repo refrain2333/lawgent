@@ -1,5 +1,5 @@
 # 依赖注入
-from fastapi import Depends, HTTPException, Query, Request
+from fastapi import Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
@@ -9,23 +9,6 @@ from app.db.database import get_db
 from app.models.models import User
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/user/access-token")
-
-
-def _extract_token(request: Request, token: str | None) -> str:
-    """优先从 Authorization header 取 Token，其次回退到 query 参数。
-
-    query 回退仅为兼容浏览器 SSE（fetch 流）场景，header 是推荐方式。
-    """
-    auth = request.headers.get("Authorization", "")
-    if auth.lower().startswith("bearer "):
-        return auth[7:].strip()
-    if token:
-        return token
-    raise HTTPException(
-        status_code=401,
-        detail="缺少 Token",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
 
 
 async def _get_authenticated_user(token: str, db: AsyncSession) -> User:
@@ -58,16 +41,14 @@ async def get_current_user(
 
 
 async def get_user_id(
-    request: Request,
-    token: str | None = Query(None, description="JWT Token（可选，兼容 SSE；推荐使用 Authorization header）"),
+    token: str = Depends(oauth2_scheme),
     db: AsyncSession = Depends(get_db),
     ) -> int:
-    """从请求中解析 user_id。
+    """从 Authorization header 解析 user_id。
 
-    优先读取 Authorization: Bearer <token>，其次读取 query 参数 token。
-    不再接受任何硬编码的调试 Token。
+    只接受标准的 Bearer Token，不再支持 query 参数传 Token，
+    避免凭据被写入访问日志或代理日志。
     """
-    raw = _extract_token(request, token)
-    user = await _get_authenticated_user(raw, db)
+    user = await _get_authenticated_user(token, db)
     return user.id
 

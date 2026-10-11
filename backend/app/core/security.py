@@ -53,8 +53,15 @@ def create_access_token(data: dict[str, Any]) -> str:
 
 
 def decode_access_token(token: str) -> dict[str, Any] | None:
-    """解码 JWT Token，失败返回 None"""
+    """解码 JWT Token，失败返回 None。
+
+    强制要求 Token 携带 exp，避免出现永不过期的凭据。
+    （python-jose 的 options={"require": [...]} 不生效，这里手动校验。）
+    """
     try:
-        return jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
+        payload = jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
     except jwt.JWTError:
         return None
+    if "exp" not in payload:
+        return None
+    return payload

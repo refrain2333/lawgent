@@ -17,6 +17,7 @@ from app.agent.service.s3 import chat_s3, summarize_facts
 from app.agent.service.s4 import chat_s4, gen_report
 from app.core.deps import get_user_id
 from app.core.logger import logger
+from app.core.rate_limit import check_rate_limit
 from app.db.database import get_db
 from app.models.models import (
     Conversation,
@@ -34,6 +35,12 @@ router = APIRouter(tags=["Agent"])
 _background_tasks: set[asyncio.Task[None]] = set()
 _STAGE_TASK_TIMEOUT = 15 * 60
 _STAGE_RECOVERY_AFTER = timedelta(minutes=30)
+
+# 单用户限流：创建会话与发送消息（消息会消耗 LLM 额度）
+_SESSION_RATE_LIMIT = 10
+_SESSION_RATE_WINDOW = 60
+_MESSAGE_RATE_LIMIT = 20
+_MESSAGE_RATE_WINDOW = 60
 
 
 def _start_background(coro: Coroutine[Any, Any, None]) -> None:
@@ -124,6 +131,7 @@ async def create_session(
     db: AsyncSession = Depends(get_db),
     ):
     """创建新会话，返回 thread_id"""
+    check_rate_limit(f"session:{user_id}", _SESSION_RATE_LIMIT, _SESSION_RATE_WINDOW)
     thread_id = str(uuid.uuid4())
     conv = Conversation(user_id=user_id, thread_id=thread_id, stage=ConversationStage.S1_COLLECTING)
     db.add(conv)
@@ -204,6 +212,7 @@ async def send_message(
     if not content:
         raise HTTPException(status_code=400, detail="消息内容不能为空")
 
+    check_rate_limit(f"message:{user_id}", _MESSAGE_RATE_LIMIT, _MESSAGE_RATE_WINDOW)
     conv = await _get_conv(thread_id, user_id, db)
     history = await conversation_service.get_messages(thread_id, db)
     message_stage = conv.stage
